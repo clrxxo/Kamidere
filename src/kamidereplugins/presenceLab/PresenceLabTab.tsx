@@ -835,6 +835,7 @@ function PresenceLabTab() {
                 </div>
             </Card>
             </div>
+            </div>
 
             <Card className={cl("panel-card", "history-card")} defaultPadding>
                 <div className={cl("section-head")}>
@@ -915,7 +916,6 @@ function PresenceLabTab() {
                     </div>
                 )}
             </Card>
-            </div>
             </div>
         </SettingsTab>
     );

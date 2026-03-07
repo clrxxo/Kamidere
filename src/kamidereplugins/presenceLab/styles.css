@@ -3,7 +3,13 @@
     display: flex;
     flex-direction: column;
     gap: 18px;
-    margin-top: 20px;
+    width: min(1480px, calc(100vw - 360px));
+    min-width: 100%;
+    max-width: calc(100vw - 32px);
+    box-sizing: border-box;
+    margin: 20px auto 0;
+    left: 50%;
+    transform: translateX(-50%);
     isolation: isolate;
 }
 
@@ -126,9 +132,9 @@
     inset: 0;
     border-radius: inherit;
     background:
-        radial-gradient(circle, rgba(255, 255, 255, 0.1) 1px, transparent 1px);
-    background-size: 24px 24px;
-    opacity: 0.12;
+        radial-gradient(circle at 36% 50%, rgba(240, 186, 98, 0.16), transparent 20%),
+        linear-gradient(90deg, rgba(240, 186, 98, 0.08), transparent 24%, transparent 76%, rgba(141, 183, 216, 0.08));
+    opacity: 0.5;
     pointer-events: none;
 }
 
@@ -636,7 +642,7 @@
 
 @media (min-width: 1080px) {
     .vc-presence-lab-dashboard-grid {
-        grid-template-columns: minmax(0, 1.32fr) minmax(300px, 0.88fr);
+        grid-template-columns: minmax(0, 1.55fr) minmax(340px, 0.95fr);
         align-items: start;
     }
 
@@ -666,6 +672,10 @@
 }
 
 @media (min-width: 1320px) {
+    .vc-presence-lab-dashboard-grid {
+        grid-template-columns: minmax(0, 1.7fr) minmax(360px, 1fr);
+    }
+
     .vc-presence-lab-gauge-grid {
         grid-template-columns: repeat(3, minmax(0, 1fr));
     }
@@ -677,6 +687,15 @@
 }
 
 @media (max-width: 760px) {
+    .vc-presence-lab-shell {
+        width: 100%;
+        min-width: 0;
+        max-width: 100%;
+        margin: 20px 0 0;
+        left: auto;
+        transform: none;
+    }
+
     .vc-presence-lab-metric-grid,
     .vc-presence-lab-gauge-grid,
     .vc-presence-lab-insight-grid,
