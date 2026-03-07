@@ -64,7 +64,7 @@ type SettingsLocation =
     | "bottom";
 
 interface SettingsLayoutNode {
-    type: LayoutType;
+    type: LayoutType | SectionType;
     key?: string;
     legacySearchKey?: string;
     getLegacySearchKey?(): string;
@@ -204,10 +204,17 @@ export default definePlugin({
         this.layoutVersion++;
     },
 
-    getSectionEntries() {
-        const { buildEntry } = this;
+    buildDivider(key: string): SettingsLayoutNode {
+        return {
+            key,
+            type: SectionType.DIVIDER
+        };
+    },
 
-        return [
+    getSectionEntries() {
+        const { buildEntry, buildDivider } = this;
+
+        const coreEntries = [
             buildEntry({
                 key: "equicord_main",
                 title: BRAND_NAME,
@@ -258,9 +265,17 @@ export default definePlugin({
                 title: "Patch Helper",
                 Component: PatchHelperTab,
                 Icon: PatchHelperIcon
-            }),
-            ...this.customEntries.map(buildEntry)
+            })
         ].filter(isTruthy);
+
+        const pluginEntries = this.customEntries.map(buildEntry).filter(isTruthy);
+
+        return [
+            ...coreEntries,
+            ...(pluginEntries.length
+                ? [buildDivider("equicord_custom_plugins_divider"), ...pluginEntries]
+                : [])
+        ];
     },
 
     buildLayout(originalLayoutBuilder: SettingsLayoutBuilder) {
