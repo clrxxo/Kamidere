@@ -952,7 +952,7 @@ function SendTrailTab() {
 
                         <div className={cl("toolbar-actions", "toolbar-actions-stack")}>
                             <Button
-                                size="small"
+                                size="xs"
                                 variant="secondary"
                                 className={cl("action-button", "action-button-select")}
                                 disabled={pagedRecords.length === 0 || isBusy}
@@ -962,13 +962,13 @@ function SendTrailTab() {
                                 <span className={cl("action-button-count")}>{pagedRecords.length}</span>
                             </Button>
                             <Button
-                                size="small"
+                                size="xs"
                                 variant="dangerPrimary"
                                 className={cl("action-button", "action-button-purge")}
                                 disabled={selectedRecords.length === 0 || isBusy}
                                 onClick={confirmPurge}
                             >
-                                <DeleteIcon width={15} height={15} />
+                                <DeleteIcon width={13} height={13} />
                                 <span>Purge Selected</span>
                             </Button>
                         </div>
@@ -1064,7 +1064,7 @@ function SendTrailTab() {
 
                         <div className={cl("pagination-controls")}>
                             <Button
-                                size="small"
+                                size="xs"
                                 variant="secondary"
                                 disabled={currentPage <= 1 || filteredRecords.length === 0 || isBusy}
                                 onClick={() => setCurrentPage(page => Math.max(1, page - 1))}
@@ -1075,7 +1075,7 @@ function SendTrailTab() {
                                 Page {currentPage} / {totalPages}
                             </span>
                             <Button
-                                size="small"
+                                size="xs"
                                 variant="secondary"
                                 disabled={currentPage >= totalPages || filteredRecords.length === 0 || isBusy}
                                 onClick={() => setCurrentPage(page => Math.min(totalPages, page + 1))}
