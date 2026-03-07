@@ -1,0 +1,215 @@
+:root {
+    --vc-send-trail-accent: #f4bd6a;
+    --vc-send-trail-accent-soft: rgb(244 189 106 / 14%);
+    --vc-send-trail-border: rgb(255 240 220 / 14%);
+    --vc-send-trail-surface: linear-gradient(180deg, rgb(24 10 14 / 92%), rgb(48 16 23 / 94%));
+}
+
+.vc-send-trail-hero-metrics {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 1rem;
+}
+
+.vc-send-trail-hero-pill,
+.vc-send-trail-time-pill,
+.vc-send-trail-group-count,
+.vc-send-trail-scope-pill,
+.vc-send-trail-media-chip {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    border: 1px solid var(--vc-send-trail-border);
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+
+.vc-send-trail-hero-pill {
+    min-height: 34px;
+    padding: 0 14px;
+    background: rgb(255 248 235 / 10%);
+    color: #fff4e3;
+    backdrop-filter: blur(10px);
+}
+
+.vc-send-trail-stats-grid,
+.vc-send-trail-filter-grid {
+    display: grid;
+    gap: 16px;
+    margin-top: 16px;
+}
+
+.vc-send-trail-stats-grid {
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
+
+.vc-send-trail-filter-grid {
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.vc-send-trail-stat-card,
+.vc-send-trail-filter-card,
+.vc-send-trail-record-card,
+.vc-send-trail-empty-card {
+    border: 1px solid var(--vc-send-trail-border);
+    background: var(--vc-send-trail-surface);
+}
+
+.vc-send-trail-stat-title,
+.vc-send-trail-filter-label,
+.vc-send-trail-stat-subtitle,
+.vc-send-trail-record-muted,
+.vc-send-trail-record-timestamp {
+    margin: 0;
+}
+
+.vc-send-trail-stat-title,
+.vc-send-trail-filter-label {
+    margin-bottom: 10px;
+    color: var(--text-muted);
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.vc-send-trail-stat-value {
+    margin: 0 0 6px;
+}
+
+.vc-send-trail-stat-subtitle,
+.vc-send-trail-record-muted,
+.vc-send-trail-record-timestamp {
+    color: var(--text-muted);
+}
+
+.vc-send-trail-empty-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    margin-top: 16px;
+    padding: 28px;
+    text-align: center;
+}
+
+.vc-send-trail-empty-icon {
+    width: 36px;
+    height: 36px;
+    color: var(--vc-send-trail-accent);
+}
+
+.vc-send-trail-group {
+    margin-top: 20px;
+}
+
+.vc-send-trail-group-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.vc-send-trail-group-count {
+    padding: 0 12px;
+    min-height: 30px;
+    background: var(--vc-send-trail-accent-soft);
+    color: var(--text-normal);
+}
+
+.vc-send-trail-group-list {
+    display: grid;
+    gap: 12px;
+}
+
+.vc-send-trail-record-card {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.vc-send-trail-record-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.vc-send-trail-record-context-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 6px;
+}
+
+.vc-send-trail-scope-pill {
+    min-height: 28px;
+    padding: 0 10px;
+}
+
+.vc-send-trail-scope-pill-guild {
+    background: var(--vc-send-trail-accent-soft);
+    color: var(--text-normal);
+}
+
+.vc-send-trail-scope-pill-dm {
+    background: rgb(114 137 218 / 14%);
+    color: var(--text-normal);
+}
+
+.vc-send-trail-channel-name {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--header-primary);
+}
+
+.vc-send-trail-record-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 10px;
+}
+
+.vc-send-trail-time-pill {
+    min-height: 30px;
+    padding: 0 12px;
+    background: rgb(255 248 235 / 8%);
+    color: var(--text-normal);
+}
+
+.vc-send-trail-record-content {
+    margin: 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: var(--text-normal);
+}
+
+.vc-send-trail-media-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.vc-send-trail-media-chip {
+    min-height: 28px;
+    padding: 0 10px;
+    background: rgb(255 255 255 / 5%);
+    color: var(--text-normal);
+}
+
+@media (max-width: 720px) {
+    .vc-send-trail-record-header {
+        flex-direction: column;
+    }
+
+    .vc-send-trail-record-actions {
+        align-items: stretch;
+    }
+
+    .vc-send-trail-record-actions .vc-btn-base {
+        width: 100%;
+    }
+}
