@@ -27,6 +27,7 @@ const LIVE_DELETE_DELAY_MS = 850;
 const PURGE_STATUS_HIDE_DELAY_MS = 2400;
 const PURGE_STATUS_TRANSITION_MS = 280;
 const DEFAULT_PAGE_SIZE: PageSizeValue = "5";
+const INPUT_TEXT_COLOR = "var(--text-normal, var(--header-primary, #f2f3f5))";
 
 const HERO_BACKGROUND = `data:image/svg+xml;utf8,${encodeURIComponent(
     [
@@ -382,19 +383,25 @@ function SendTrailConfigModal({
     );
     const [manualProtectedDmUserId, setManualProtectedDmUserId] = React.useState("");
     const requestedDmUsersRef = React.useRef<Set<string>>(new Set());
+    const manualProtectedDmUserInputRef = React.useRef<HTMLInputElement | null>(null);
     const applyProtectedUserInputStyles = React.useCallback((node: HTMLInputElement | null) => {
         if (!node) return;
 
         const apply = () => {
-            node.style.setProperty("color", "var(--text-normal)", "important");
-            node.style.setProperty("-webkit-text-fill-color", "var(--text-normal)", "important");
-            node.style.setProperty("caret-color", "var(--text-normal)", "important");
+            node.style.setProperty("color", INPUT_TEXT_COLOR, "important");
+            node.style.setProperty("-webkit-text-fill-color", INPUT_TEXT_COLOR, "important");
+            node.style.setProperty("caret-color", INPUT_TEXT_COLOR, "important");
             node.style.setProperty("background-color", "transparent", "important");
+            node.style.setProperty("opacity", "1", "important");
         };
 
         apply();
         window.requestAnimationFrame(apply);
     }, []);
+
+    React.useLayoutEffect(() => {
+        applyProtectedUserInputStyles(manualProtectedDmUserInputRef.current);
+    }, [applyProtectedUserInputStyles, manualProtectedDmUserId]);
 
     const purgeTargetOptions: SelectOption<SendTrailPurgeTarget>[] = [
         { label: "Everything", value: "all" },
@@ -570,8 +577,11 @@ function SendTrailConfigModal({
                             value={manualProtectedDmUserId}
                             placeholder="Add a friend by user ID"
                             onChange={setManualProtectedDmUserId}
-                            inputRef={applyProtectedUserInputStyles}
-                            onFocus={() => applyProtectedUserInputStyles(document.activeElement as HTMLInputElement | null)}
+                            inputRef={node => {
+                                manualProtectedDmUserInputRef.current = node;
+                                applyProtectedUserInputStyles(node);
+                            }}
+                            onFocus={() => applyProtectedUserInputStyles(manualProtectedDmUserInputRef.current)}
                             onKeyDown={event => {
                                 if (event.key !== "Enter") return;
                                 event.preventDefault();
