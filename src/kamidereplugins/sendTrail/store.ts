@@ -6,6 +6,17 @@ import type { SentTrailMediaItem, SentTrailRecord } from "./types";
 
 const STORAGE_PREFIX = "kamidere-send-trail:";
 const signals = new Set<DispatchWithoutAction>();
+const recordCache = new Map<string, SentTrailRecord[]>();
+
+function getCachedRecords(userId: string | null) {
+    if (!userId) return [];
+    return recordCache.get(userId) ?? [];
+}
+
+function setCachedRecords(userId: string | null, records: SentTrailRecord[]) {
+    if (!userId) return;
+    recordCache.set(userId, records);
+}
 
 function emit() {
     signals.forEach(signal => signal());
@@ -18,12 +29,15 @@ function getStorageKey(userId: string) {
 export async function getSentTrailRecords(userId: string | null) {
     if (!userId) return [];
     const records = await DataStore.get(getStorageKey(userId)) as SentTrailRecord[] | undefined;
-    return records ?? [];
+    const nextRecords = records ?? [];
+    setCachedRecords(userId, nextRecords);
+    return nextRecords;
 }
 
 export async function appendSentTrailRecord(record: SentTrailRecord) {
     const userId = UserStore.getCurrentUser()?.id;
     if (!userId) return;
+    let nextRecords = getCachedRecords(userId);
 
     await DataStore.update(getStorageKey(userId), (existing: SentTrailRecord[] | undefined) => {
         const records = existing ?? [];
@@ -42,9 +56,11 @@ export async function appendSentTrailRecord(record: SentTrailRecord) {
         }
 
         records.sort((left, right) => right.timestamp - left.timestamp);
+        nextRecords = records;
         return records;
     });
 
+    setCachedRecords(userId, nextRecords);
     emit();
 }
 
@@ -58,6 +74,7 @@ export async function mergeSentTrailRecordMedia(
     if (!userId || media.length === 0) return;
 
     let didChange = false;
+    let nextRecords = getCachedRecords(userId);
 
     await DataStore.update(getStorageKey(userId), (existing: SentTrailRecord[] | undefined) => {
         const records = existing ?? [];
@@ -104,15 +121,20 @@ export async function mergeSentTrailRecordMedia(
         }
 
         records[index] = nextRecord;
+        nextRecords = records;
         return records;
     });
 
-    if (didChange) emit();
+    if (didChange) {
+        setCachedRecords(userId, nextRecords);
+        emit();
+    }
 }
 
 export async function clearSentTrailRecords(userId: string | null) {
     if (!userId) return;
     await DataStore.set(getStorageKey(userId), []);
+    setCachedRecords(userId, []);
     emit();
 }
 
@@ -121,21 +143,27 @@ export async function clearSentTrailRecordsWhere(
     predicate: (record: SentTrailRecord) => boolean,
 ) {
     if (!userId) return;
+    let nextRecords = getCachedRecords(userId);
 
-    await DataStore.update(getStorageKey(userId), (existing: SentTrailRecord[] | undefined) =>
-        (existing ?? []).filter(record => !predicate(record)),
-    );
+    await DataStore.update(getStorageKey(userId), (existing: SentTrailRecord[] | undefined) => {
+        nextRecords = (existing ?? []).filter(record => !predicate(record));
+        return nextRecords;
+    });
 
+    setCachedRecords(userId, nextRecords);
     emit();
 }
 
 export async function removeSentTrailRecord(userId: string | null, channelId: string, messageId: string) {
     if (!userId) return;
+    let nextRecords = getCachedRecords(userId);
 
-    await DataStore.update(getStorageKey(userId), (existing: SentTrailRecord[] | undefined) =>
-        (existing ?? []).filter(record => !(record.channelId === channelId && record.messageId === messageId)),
-    );
+    await DataStore.update(getStorageKey(userId), (existing: SentTrailRecord[] | undefined) => {
+        nextRecords = (existing ?? []).filter(record => !(record.channelId === channelId && record.messageId === messageId));
+        return nextRecords;
+    });
 
+    setCachedRecords(userId, nextRecords);
     emit();
 }
 
@@ -148,8 +176,8 @@ export async function removeSentTrailRecordsWhere(
 
 export function useSentTrailRecords(userId: string | null) {
     const [signal, setSignal] = React.useReducer(value => value + 1, 0);
-    const [records, setRecords] = React.useState<SentTrailRecord[]>([]);
-    const [pending, setPending] = React.useState(true);
+    const [records, setRecords] = React.useState<SentTrailRecord[]>(() => getCachedRecords(userId));
+    const [pending, setPending] = React.useState(() => !!userId && !recordCache.has(userId));
     const previousUserIdRef = React.useRef<string | null | undefined>(void 0);
 
     React.useEffect(() => {
@@ -163,7 +191,9 @@ export function useSentTrailRecords(userId: string | null) {
         previousUserIdRef.current = userId;
 
         if (userChanged) {
-            setPending(true);
+            const cachedRecords = getCachedRecords(userId);
+            setRecords(cachedRecords);
+            setPending(!!userId && !recordCache.has(userId));
             if (!userId) setRecords([]);
         }
 
