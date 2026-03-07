@@ -56,12 +56,16 @@ export function PluginCard({ plugin, disabled, onRestartNeeded, onMouseEnter, on
         }
     }, []);
 
-    function refreshPluginSettingsView() {
+    async function refreshPluginSettingsView() {
         if (!plugin.settingsTab) return;
 
-        window.requestAnimationFrame(() => {
+        try {
+            await SettingsRouter.openUserSettings("my_account_panel");
+            await new Promise<void>(resolve => window.requestAnimationFrame(() => resolve()));
+            await SettingsRouter.openUserSettings("equicord_plugins_panel");
+        } catch {
             void SettingsRouter.openUserSettings("equicord_plugins_panel");
-        });
+        }
     }
 
     function showSettingsTabStatus(enabled: boolean) {
@@ -139,7 +143,7 @@ export function PluginCard({ plugin, disabled, onRestartNeeded, onMouseEnter, on
         settings.enabled = !wasEnabled;
 
         if (plugin.settingsTab) {
-            refreshPluginSettingsView();
+            void refreshPluginSettingsView();
             showSettingsTabStatus(!wasEnabled);
         }
     }
