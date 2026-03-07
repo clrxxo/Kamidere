@@ -51,7 +51,6 @@
     min-width: 0;
 }
 
-.vc-presence-lab-overview-stack,
 .vc-presence-lab-runtime-card,
 .vc-presence-lab-panel-card,
 .vc-presence-lab-session-card,
@@ -360,7 +359,11 @@
 
 .vc-presence-lab-strip-card,
 .vc-presence-lab-pair-card {
-    min-height: 228px;
+    min-height: 0;
+}
+
+.vc-presence-lab-strip-card {
+    padding-bottom: 14px;
 }
 
 .vc-presence-lab-strip-bars {
