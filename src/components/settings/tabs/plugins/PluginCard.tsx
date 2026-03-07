@@ -11,7 +11,7 @@ import { AddonCard } from "@components/settings/AddonCard";
 import { classNameFactory } from "@utils/css";
 import { Logger } from "@utils/Logger";
 import { OptionType, Plugin } from "@utils/types";
-import { React, SettingsRouter, showToast, Toasts } from "@webpack/common";
+import { FluxDispatcher, React, SettingsRouter, showToast, Toasts } from "@webpack/common";
 import { Settings } from "Vencord";
 
 import { PluginMeta } from "~plugins";
@@ -33,6 +33,7 @@ interface PluginCardProps extends React.HTMLProps<HTMLDivElement> {
 
 const SETTINGS_TAB_STATUS_HIDE_DELAY_MS = 2200;
 const SETTINGS_TAB_STATUS_TRANSITION_MS = 280;
+const SETTINGS_MODAL_REOPEN_DELAY_MS = 70;
 
 export function PluginCard({ plugin, disabled, onRestartNeeded, onMouseEnter, onMouseLeave, isNew }: PluginCardProps) {
     const settings = Settings.plugins[plugin.name];
@@ -60,9 +61,10 @@ export function PluginCard({ plugin, disabled, onRestartNeeded, onMouseEnter, on
         if (!plugin.settingsTab) return;
 
         try {
-            await SettingsRouter.openUserSettings("my_account_panel");
-            await new Promise<void>(resolve => window.requestAnimationFrame(() => resolve()));
-            await SettingsRouter.openUserSettings("equicord_plugins_panel");
+            FluxDispatcher.dispatch({ type: "USER_SETTINGS_MODAL_CLOSE" });
+            window.setTimeout(() => {
+                void SettingsRouter.openUserSettings("equicord_plugins_panel");
+            }, SETTINGS_MODAL_REOPEN_DELAY_MS);
         } catch {
             void SettingsRouter.openUserSettings("equicord_plugins_panel");
         }
