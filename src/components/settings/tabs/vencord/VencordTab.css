@@ -1,0 +1,28 @@
+:root {
+    --vc-kamidere-accent: #f4bd6a;
+    --vc-kamidere-accent-soft: rgb(244 189 106 / 16%);
+    --vc-kamidere-border: rgb(255 240 220 / 14%);
+    --vc-kamidere-surface: linear-gradient(135deg, rgb(18 8 11 / 92%), rgb(70 18 28 / 86%));
+}
+
+.vc-vencord-tab-hero-metrics {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 1rem;
+}
+
+.vc-vencord-tab-hero-pill {
+    display: inline-flex;
+    align-items: center;
+    min-height: 34px;
+    padding: 0 14px;
+    border-radius: 999px;
+    border: 1px solid var(--vc-kamidere-border);
+    background: rgb(255 248 235 / 10%);
+    color: #fff4e3;
+    font-size: 0.9rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    backdrop-filter: blur(10px);
+}
