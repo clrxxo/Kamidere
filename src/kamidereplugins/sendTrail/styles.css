@@ -129,24 +129,9 @@
 }
 
 .vc-send-trail-filter-panel {
-    padding: 14px;
-    border: 1px solid var(--vc-send-trail-border);
-    border-radius: 8px;
-    background: color-mix(in oklab, var(--background-secondary) 96%, #fff 4%);
-}
-
-.vc-send-trail-filter-panel-header {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 12px;
-    margin-bottom: 12px;
-}
-
-.vc-send-trail-filter-panel-copy {
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
+    margin-top: 10px;
+    padding-top: 12px;
+    border-top: 1px solid var(--vc-send-trail-border);
 }
 
 .vc-send-trail-toolbar-field {
@@ -471,7 +456,6 @@
 @media (max-width: 760px) {
     .vc-send-trail-toolbar-topline,
     .vc-send-trail-toolbar-footer,
-    .vc-send-trail-filter-panel-header,
     .vc-send-trail-group-header,
     .vc-send-trail-record-header,
     .vc-send-trail-purge-status,

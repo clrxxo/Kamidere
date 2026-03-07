@@ -790,15 +790,6 @@ function SendTrailTab() {
                 </div>
 
                 <div className={cl("filter-panel")}>
-                    <div className={cl("filter-panel-header")}>
-                        <div className={cl("filter-panel-copy")}>
-                            <BaseText size="md" weight="semibold">Advanced Filter</BaseText>
-                            <Paragraph className={cl("history-summary")}>
-                                {scopeLabel} / {kindLabel} / {periodLabel}
-                            </Paragraph>
-                        </div>
-                    </div>
-
                     <div className={cl("toolbar-grid")}>
                         <div className={cl("toolbar-field")}>
                             <Paragraph className={cl("field-label")}>Destination</Paragraph>
