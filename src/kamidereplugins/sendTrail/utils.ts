@@ -1,3 +1,4 @@
+import { MessageFlags, MessageReferenceType } from "@vencord/discord-types/enums";
 import type { Channel, CloudUpload, Message, MessageAttachment } from "@vencord/discord-types";
 import type { Embed, EmbedMedia } from "@vencord/discord-types";
 import { ChannelStore, GuildStore } from "@webpack/common";
@@ -184,7 +185,19 @@ export function getMessageDisplayContent(message: Partial<Message>, fallbackCont
 }
 
 export function isForwardedMessage(message: Partial<Message>) {
-    return (message.messageSnapshots?.length ?? 0) > 0;
+    if ((message.messageSnapshots?.length ?? 0) > 0) return true;
+    if (message.messageReference?.type === MessageReferenceType.FORWARD) return true;
+
+    if (typeof message.hasFlag === "function") {
+        try {
+            if (message.hasFlag(MessageFlags.HAS_SNAPSHOT)) return true;
+        } catch {
+            // Ignore invalid message instances and fall through to raw flag checks.
+        }
+    }
+
+    const rawFlags = Number(message.flags ?? 0);
+    return (rawFlags & MessageFlags.HAS_SNAPSHOT) !== 0;
 }
 
 export function getMessageTimestamp(message: Pick<Message, "timestamp">) {
