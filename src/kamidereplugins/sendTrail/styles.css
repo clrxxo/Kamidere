@@ -142,6 +142,24 @@
     margin-bottom: 0;
 }
 
+.vc-send-trail-history-controls-copy,
+.vc-send-trail-history-footer-copy,
+.vc-send-trail-history-footer-actions,
+.vc-send-trail-pagination-controls,
+.vc-send-trail-pagination-field {
+    display: flex;
+}
+
+.vc-send-trail-history-controls-copy,
+.vc-send-trail-history-footer-copy {
+    flex-direction: column;
+    gap: 8px;
+}
+
+.vc-send-trail-history-controls-copy {
+    flex: 1 1 auto;
+}
+
 .vc-send-trail-history-chip {
     display: inline-flex;
     align-items: center;
@@ -218,6 +236,7 @@
 .vc-send-trail-toolbar-clear {
     font-size: 0.82rem;
     color: var(--text-muted);
+    align-self: flex-start;
 }
 
 .vc-send-trail-history-filter-surface {
@@ -318,7 +337,18 @@
     margin-top: 14px;
     padding-top: 14px;
     border-top: 1px solid rgb(255 255 255 / 6%);
-    align-items: center;
+    align-items: flex-end;
+}
+
+.vc-send-trail-toolbar-actions-stack {
+    flex-direction: column;
+    align-items: stretch;
+    width: 184px;
+    flex: 0 0 184px;
+}
+
+.vc-send-trail-toolbar-actions-stack .vc-send-trail-action-button {
+    justify-content: space-between;
 }
 
 .vc-send-trail-history-list {
@@ -332,7 +362,40 @@
     margin-top: 16px;
     padding-top: 14px;
     border-top: 1px solid var(--vc-send-trail-border);
-    align-items: flex-start;
+    align-items: center;
+}
+
+.vc-send-trail-history-footer-copy {
+    flex: 1 1 auto;
+}
+
+.vc-send-trail-history-footer-actions {
+    align-items: flex-end;
+    gap: 14px;
+}
+
+.vc-send-trail-pagination-field {
+    flex-direction: column;
+    gap: 8px;
+    min-width: 150px;
+}
+
+.vc-send-trail-pagination-controls {
+    align-items: center;
+    gap: 8px;
+}
+
+.vc-send-trail-pagination-status {
+    display: inline-flex;
+    align-items: center;
+    min-height: 32px;
+    padding: 0 10px;
+    border: 1px solid rgb(255 255 255 / 8%);
+    border-radius: 8px;
+    background: rgb(255 255 255 / 4%);
+    color: var(--text-muted);
+    font-size: 0.82rem;
+    font-weight: 600;
 }
 
 .vc-send-trail-toolbar-hint,
@@ -717,6 +780,11 @@
         justify-content: flex-start;
     }
 
+    .vc-send-trail-toolbar-actions-stack {
+        flex: 1 1 auto;
+        width: 100%;
+    }
+
     .vc-send-trail-purge-status-title-row {
         flex-direction: column;
         align-items: flex-start;
@@ -729,5 +797,16 @@
     .vc-send-trail-action-button-select,
     .vc-send-trail-action-button-purge {
         min-width: 0;
+    }
+
+    .vc-send-trail-history-footer-actions,
+    .vc-send-trail-pagination-controls {
+        flex-wrap: wrap;
+        align-items: stretch;
+    }
+
+    .vc-send-trail-pagination-field {
+        min-width: 0;
+        width: 100%;
     }
 }

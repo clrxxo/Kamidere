@@ -26,6 +26,7 @@ const cl = classNameFactory("vc-send-trail-");
 const LIVE_DELETE_DELAY_MS = 850;
 const PURGE_STATUS_HIDE_DELAY_MS = 2400;
 const PURGE_STATUS_TRANSITION_MS = 280;
+const DEFAULT_PAGE_SIZE: PageSizeValue = "15";
 
 const HERO_BACKGROUND = `data:image/svg+xml;utf8,${encodeURIComponent(
     [
@@ -50,6 +51,7 @@ const HERO_BACKGROUND = `data:image/svg+xml;utf8,${encodeURIComponent(
 type ScopeValue = "all" | "dms" | `guild:${string}`;
 type KindValue = "all" | "text" | "media";
 type PeriodValue = "all" | "24h" | "7d";
+type PageSizeValue = "15" | "30" | "60";
 type PurgeStatusPhase = "idle" | "running" | "success" | "partial" | "failure";
 
 interface SelectOption<T extends string> {
@@ -435,6 +437,8 @@ function SendTrailTab() {
     const [scope, setScope] = React.useState<ScopeValue>("all");
     const [kind, setKind] = React.useState<KindValue>("all");
     const [period, setPeriod] = React.useState<PeriodValue>("all");
+    const [pageSize, setPageSize] = React.useState<PageSizeValue>(DEFAULT_PAGE_SIZE);
+    const [currentPage, setCurrentPage] = React.useState(1);
     const [query, setQuery] = React.useState("");
     const [selectedIds, setSelectedIds] = React.useState<Set<string>>(() => new Set());
     const [deletingIds, setDeletingIds] = React.useState<Set<string>>(() => new Set());
@@ -562,6 +566,12 @@ function SendTrailTab() {
         { label: "Media only", value: "media" },
     ];
 
+    const pageSizeOptions: SelectOption<PageSizeValue>[] = [
+        { label: "15 messages", value: "15" },
+        { label: "30 messages", value: "30" },
+        { label: "60 messages", value: "60" },
+    ];
+
     const filteredRecords = React.useMemo(() => {
         const search = query.trim().toLowerCase();
         const cutoff = period === "24h"
@@ -580,10 +590,28 @@ function SendTrailTab() {
         });
     }, [kind, period, query, records, scope]);
 
+    const pageSizeNumber = Number(pageSize);
+    const totalPages = Math.max(1, Math.ceil(filteredRecords.length / pageSizeNumber));
+    const pageStartIndex = (currentPage - 1) * pageSizeNumber;
+
+    React.useEffect(() => {
+        setCurrentPage(1);
+    }, [kind, pageSize, period, query, scope]);
+
+    React.useEffect(() => {
+        if (currentPage <= totalPages) return;
+        setCurrentPage(totalPages);
+    }, [currentPage, totalPages]);
+
+    const pagedRecords = React.useMemo(
+        () => filteredRecords.slice(pageStartIndex, pageStartIndex + pageSizeNumber),
+        [filteredRecords, pageSizeNumber, pageStartIndex],
+    );
+
     const groupedRecords = React.useMemo<RecordGroup[]>(() => {
         const groups = new Map<string, SentTrailRecord[]>();
 
-        for (const record of filteredRecords) {
+        for (const record of pagedRecords) {
             const label = formatDayLabel(record.timestamp);
             const existing = groups.get(label);
             if (existing) existing.push(record);
@@ -594,7 +622,7 @@ function SendTrailTab() {
             label,
             records: grouped,
         }));
-    }, [filteredRecords]);
+    }, [pagedRecords]);
 
     const selectedRecords = React.useMemo(
         () => records.filter(record => selectedIds.has(record.id)),
@@ -606,29 +634,31 @@ function SendTrailTab() {
         [protectedDmChannels, purgeConfig.protectAllDms, purgeTarget, selectedRecords],
     );
 
-    const allVisibleSelected = filteredRecords.length > 0 && filteredRecords.every(record => selectedIds.has(record.id));
+    const allVisibleSelected = pagedRecords.length > 0 && pagedRecords.every(record => selectedIds.has(record.id));
     const protectedSelectedCount = selectedRecords.length - selectedEligibleRecords.length;
     const dmConversationCount = React.useMemo(() => buildDmConversations(records).length, [records]);
     const isBusy = purgeStatus.phase === "running";
     const scopeLabel = scopeOptions.find(option => option.value === scope)?.label ?? "All destinations";
     const kindLabel = kindOptions.find(option => option.value === kind)?.label ?? "Everything";
     const periodLabel = periodOptions.find(option => option.value === period)?.label ?? "All time";
+    const pageRangeStart = filteredRecords.length === 0 ? 0 : pageStartIndex + 1;
+    const pageRangeEnd = filteredRecords.length === 0 ? 0 : Math.min(filteredRecords.length, pageStartIndex + pageSizeNumber);
 
     const toggleVisibleSelection = React.useCallback(() => {
         setSelectedIds(current => {
             const next = new Set(current);
 
-            if (filteredRecords.length === 0) return next;
+            if (pagedRecords.length === 0) return next;
 
-            if (filteredRecords.every(record => next.has(record.id))) {
-                for (const record of filteredRecords) next.delete(record.id);
+            if (pagedRecords.every(record => next.has(record.id))) {
+                for (const record of pagedRecords) next.delete(record.id);
             } else {
-                for (const record of filteredRecords) next.add(record.id);
+                for (const record of pagedRecords) next.add(record.id);
             }
 
             return next;
         });
-    }, [filteredRecords]);
+    }, [pagedRecords]);
 
     const clearSelection = React.useCallback(() => setSelectedIds(new Set()), []);
 
@@ -897,34 +927,40 @@ function SendTrailTab() {
                     </div>
 
                     <div className={cl("history-controls-row")}>
-                        <div className={cl("history-chip-row")}>
-                            <span className={cl("history-chip")}>{filteredRecords.length} visible</span>
-                            <span className={cl("history-chip")}>{selectedRecords.length} selected</span>
-                            <span className={cl("history-chip", "accent")}>{selectedEligibleRecords.length} eligible</span>
-                            {!!protectedSelectedCount && (
-                                <span className={cl("history-chip", "protected")}>{protectedSelectedCount} protected</span>
+                        <div className={cl("history-controls-copy")}>
+                            <div className={cl("history-chip-row")}>
+                                <span className={cl("history-chip")}>{pagedRecords.length} on page</span>
+                                <span className={cl("history-chip")}>{filteredRecords.length} matching</span>
+                                <span className={cl("history-chip")}>{selectedRecords.length} selected</span>
+                                <span className={cl("history-chip", "accent")}>{selectedEligibleRecords.length} eligible</span>
+                                {!!protectedSelectedCount && (
+                                    <span className={cl("history-chip", "protected")}>{protectedSelectedCount} protected</span>
+                                )}
+                            </div>
+
+                            {selectedRecords.length > 0 && (
+                                <TextButton
+                                    variant="secondary"
+                                    className={cl("toolbar-clear")}
+                                    disabled={isBusy}
+                                    onClick={clearSelection}
+                                >
+                                    Clear Selection
+                                </TextButton>
                             )}
                         </div>
 
-                        <div className={cl("toolbar-actions")}>
+                        <div className={cl("toolbar-actions", "toolbar-actions-stack")}>
                             <Button
                                 size="small"
                                 variant="secondary"
                                 className={cl("action-button", "action-button-select")}
-                                disabled={filteredRecords.length === 0 || isBusy}
+                                disabled={pagedRecords.length === 0 || isBusy}
                                 onClick={toggleVisibleSelection}
                             >
                                 <span>{allVisibleSelected ? "Unselect Visible" : "Select Visible"}</span>
-                                <span className={cl("action-button-count")}>{filteredRecords.length}</span>
+                                <span className={cl("action-button-count")}>{pagedRecords.length}</span>
                             </Button>
-                            <TextButton
-                                variant="secondary"
-                                className={cl("toolbar-clear")}
-                                disabled={selectedRecords.length === 0 || isBusy}
-                                onClick={clearSelection}
-                            >
-                                Clear Selection
-                            </TextButton>
                             <Button
                                 size="small"
                                 variant="dangerPrimary"
@@ -1005,12 +1041,53 @@ function SendTrailTab() {
                 </div>
 
                 <div className={cl("history-footer")}>
-                    <Paragraph className={cl("history-summary")}>
-                        Local history stays on this device. Purge removes live Discord messages one by one.
-                    </Paragraph>
-                    <TextButton variant="secondary" disabled={records.length === 0 || isBusy} onClick={confirmLocalClear}>
-                        Clear Local History
-                    </TextButton>
+                    <div className={cl("history-footer-copy")}>
+                        <Paragraph className={cl("history-summary")}>
+                            Showing {pageRangeStart}-{pageRangeEnd} of {filteredRecords.length} matching message{filteredRecords.length === 1 ? "" : "s"}.
+                        </Paragraph>
+                        <Paragraph className={cl("history-summary")}>
+                            Local history stays on this device. Purge removes live Discord messages one by one.
+                        </Paragraph>
+                    </div>
+
+                    <div className={cl("history-footer-actions")}>
+                        <div className={cl("pagination-field")}>
+                            <Paragraph className={cl("field-label")}>Messages</Paragraph>
+                            <Select
+                                options={pageSizeOptions}
+                                select={(value: PageSizeValue) => setPageSize(value)}
+                                isSelected={(value: PageSizeValue) => pageSize === value}
+                                serialize={(value: PageSizeValue) => value}
+                                isDisabled={isBusy || filteredRecords.length === 0}
+                            />
+                        </div>
+
+                        <div className={cl("pagination-controls")}>
+                            <Button
+                                size="small"
+                                variant="secondary"
+                                disabled={currentPage <= 1 || filteredRecords.length === 0 || isBusy}
+                                onClick={() => setCurrentPage(page => Math.max(1, page - 1))}
+                            >
+                                Previous
+                            </Button>
+                            <span className={cl("pagination-status")}>
+                                Page {currentPage} / {totalPages}
+                            </span>
+                            <Button
+                                size="small"
+                                variant="secondary"
+                                disabled={currentPage >= totalPages || filteredRecords.length === 0 || isBusy}
+                                onClick={() => setCurrentPage(page => Math.min(totalPages, page + 1))}
+                            >
+                                Next
+                            </Button>
+                        </div>
+
+                        <TextButton variant="secondary" disabled={records.length === 0 || isBusy} onClick={confirmLocalClear}>
+                            Clear Local History
+                        </TextButton>
+                    </div>
                 </div>
             </Card>
         </SettingsTab>
