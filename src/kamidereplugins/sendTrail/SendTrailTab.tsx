@@ -4,7 +4,7 @@ import { BaseText } from "@components/BaseText";
 import { Button, TextButton } from "@components/Button";
 import { Card } from "@components/Card";
 import { Heading, HeadingTertiary } from "@components/Heading";
-import { CogWheel, DeleteIcon, LogIcon, MagnifyingGlassIcon } from "@components/Icons";
+import { CogWheel, DeleteIcon, LogIcon, MagnifyingGlassIcon, OpenExternalIcon } from "@components/Icons";
 import { Notice } from "@components/Notice";
 import { Paragraph } from "@components/Paragraph";
 import { SettingsTab, wrapTab } from "@components/settings";
@@ -387,23 +387,6 @@ function RecordCard({
                         {new Date(record.timestamp).toLocaleString()}
                     </Paragraph>
                 </div>
-
-                <div className={cl("record-actions")}>
-                    <span className={cl("record-time")}>{formatTime(record.timestamp)}</span>
-                    <div className={cl("record-buttons")}>
-                        <Button size="xs" variant="secondary" onClick={() => NavigationRouter.transitionTo(record.jumpLink)}>
-                            Open
-                        </Button>
-                        <Button
-                            size="xs"
-                            variant={selected ? "primary" : "secondary"}
-                            disabled={deleting}
-                            onClick={onToggleSelected}
-                        >
-                            {deleting ? "Deleting..." : selected ? "Selected" : "Select"}
-                        </Button>
-                    </div>
-                </div>
             </div>
 
             {record.hasText ? (
@@ -415,6 +398,26 @@ function RecordCard({
             )}
 
             <MediaPreview media={record.media} />
+
+            <div className={cl("record-footer")}>
+                <span className={cl("record-time")}>{formatTime(record.timestamp)}</span>
+
+                <div className={cl("record-buttons")}>
+                    <TextButton variant="secondary" className={cl("record-open-button")} onClick={() => NavigationRouter.transitionTo(record.jumpLink)}>
+                        <OpenExternalIcon className={cl("record-open-icon")} width={14} height={14} />
+                        <span>Open Message</span>
+                    </TextButton>
+                    <Button
+                        size="small"
+                        variant={selected ? "primary" : "secondary"}
+                        className={cl("record-select-button", selected ? "record-select-button-selected" : "record-select-button-idle")}
+                        disabled={deleting}
+                        onClick={onToggleSelected}
+                    >
+                        {deleting ? "Deleting..." : selected ? "Selected" : "Select"}
+                    </Button>
+                </div>
+            </div>
         </Card>
     );
 }
@@ -814,23 +817,21 @@ function SendTrailTab() {
                             Review your global send history, narrow it down, and purge the exact set you want.
                         </Paragraph>
                     </div>
+                </div>
 
-                    <div className={cl("toolbar-actions")}>
-                        <Button
-                            size="small"
-                            variant="secondary"
-                            className={cl("action-button", "action-button-select")}
-                            disabled={filteredRecords.length === 0 || isBusy}
-                            onClick={toggleVisibleSelection}
-                        >
-                            <span>{allVisibleSelected ? "Unselect Visible" : "Select Visible"}</span>
-                            <span className={cl("action-button-count")}>{filteredRecords.length}</span>
-                        </Button>
-                        {selectedRecords.length > 0 && (
-                            <TextButton variant="secondary" className={cl("toolbar-clear")} disabled={isBusy} onClick={clearSelection}>
-                                Clear Selection
-                            </TextButton>
-                        )}
+                <div className={cl("history-filter-surface")}>
+                    <div className={cl("history-filter-header")}>
+                        <div className={cl("history-filter-meta")}>
+                            <Paragraph className={cl("history-summary")}>
+                                {scopeLabel} / {kindLabel} / {periodLabel}
+                            </Paragraph>
+                            <Paragraph className={cl("history-summary")}>
+                                Purge target: {purgeTarget === "all" ? "everything" : purgeTarget === "dms" ? "DMs only" : "servers only"}
+                                {purgeConfig.protectAllDms ? " / all DMs protected" : ""}
+                                {protectedDmChannels.size ? ` / ${protectedDmChannels.size} DM thread${protectedDmChannels.size === 1 ? "" : "s"} protected` : ""}
+                            </Paragraph>
+                        </div>
+
                         <Button
                             size="iconOnly"
                             variant="secondary"
@@ -842,38 +843,6 @@ function SendTrailTab() {
                         >
                             <CogWheel width={16} height={16} />
                         </Button>
-                        <Button
-                            size="small"
-                            variant="dangerPrimary"
-                            className={cl("action-button", "action-button-purge")}
-                            disabled={selectedRecords.length === 0 || isBusy}
-                            onClick={confirmPurge}
-                        >
-                            <DeleteIcon width={15} height={15} />
-                            <span>Purge Selected</span>
-                        </Button>
-                    </div>
-                </div>
-
-                <div className={cl("history-chip-row")}>
-                    <span className={cl("history-chip")}>{filteredRecords.length} visible</span>
-                    <span className={cl("history-chip")}>{selectedRecords.length} selected</span>
-                    <span className={cl("history-chip", "accent")}>{selectedEligibleRecords.length} eligible</span>
-                    {!!protectedSelectedCount && (
-                        <span className={cl("history-chip", "protected")}>{protectedSelectedCount} protected</span>
-                    )}
-                </div>
-
-                <div className={cl("history-filter-surface")}>
-                    <div className={cl("history-filter-meta")}>
-                        <Paragraph className={cl("history-summary")}>
-                            {scopeLabel} / {kindLabel} / {periodLabel}
-                        </Paragraph>
-                        <Paragraph className={cl("history-summary")}>
-                            Purge target: {purgeTarget === "all" ? "everything" : purgeTarget === "dms" ? "DMs only" : "servers only"}
-                            {purgeConfig.protectAllDms ? " / all DMs protected" : ""}
-                            {protectedDmChannels.size ? ` / ${protectedDmChannels.size} DM thread${protectedDmChannels.size === 1 ? "" : "s"} protected` : ""}
-                        </Paragraph>
                     </div>
 
                     <div className={cl("toolbar-grid")}>
@@ -924,6 +893,48 @@ function SendTrailTab() {
                                     spellCheck={false}
                                 />
                             </label>
+                        </div>
+                    </div>
+
+                    <div className={cl("history-controls-row")}>
+                        <div className={cl("history-chip-row")}>
+                            <span className={cl("history-chip")}>{filteredRecords.length} visible</span>
+                            <span className={cl("history-chip")}>{selectedRecords.length} selected</span>
+                            <span className={cl("history-chip", "accent")}>{selectedEligibleRecords.length} eligible</span>
+                            {!!protectedSelectedCount && (
+                                <span className={cl("history-chip", "protected")}>{protectedSelectedCount} protected</span>
+                            )}
+                        </div>
+
+                        <div className={cl("toolbar-actions")}>
+                            <Button
+                                size="small"
+                                variant="secondary"
+                                className={cl("action-button", "action-button-select")}
+                                disabled={filteredRecords.length === 0 || isBusy}
+                                onClick={toggleVisibleSelection}
+                            >
+                                <span>{allVisibleSelected ? "Unselect Visible" : "Select Visible"}</span>
+                                <span className={cl("action-button-count")}>{filteredRecords.length}</span>
+                            </Button>
+                            <TextButton
+                                variant="secondary"
+                                className={cl("toolbar-clear")}
+                                disabled={selectedRecords.length === 0 || isBusy}
+                                onClick={clearSelection}
+                            >
+                                Clear Selection
+                            </TextButton>
+                            <Button
+                                size="small"
+                                variant="dangerPrimary"
+                                className={cl("action-button", "action-button-purge")}
+                                disabled={selectedRecords.length === 0 || isBusy}
+                                onClick={confirmPurge}
+                            >
+                                <DeleteIcon width={15} height={15} />
+                                <span>Purge Selected</span>
+                            </Button>
                         </div>
                     </div>
                 </div>
