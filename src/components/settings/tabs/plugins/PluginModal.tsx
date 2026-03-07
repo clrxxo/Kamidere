@@ -25,7 +25,6 @@ import { Button } from "@components/Button";
 import ErrorBoundary from "@components/ErrorBoundary";
 import { Flex } from "@components/Flex";
 import { Paragraph } from "@components/Paragraph";
-import { BRAND_NAME } from "@shared/branding";
 import { debounce } from "@shared/debounce";
 import { gitRemote } from "@shared/vencordUserAgent";
 import { classNameFactory } from "@utils/css";
@@ -44,6 +43,7 @@ import { PluginMeta } from "~plugins";
 import { OptionComponentMap } from "./components";
 import { openContributorModal } from "./ContributorModal";
 import { GithubButton, WebsiteButton } from "./LinkIconButton";
+import { getPluginSourceInfo } from "./pluginSource";
 
 const cl = classNameFactory("vc-plugin-modal-");
 
@@ -160,7 +160,7 @@ export default function PluginModal({ plugin, onRestartNeeded, onClose, transiti
     }
 
     const pluginMeta = PluginMeta[plugin.name];
-    const isEquicordPlugin = pluginMeta.folderName.startsWith("src/equicordplugins/") ?? false;
+    const sourceInfo = getPluginSourceInfo(pluginMeta?.folderName, pluginMeta?.userPlugin, plugin.isModified ?? false, plugin.name);
     const sourceUrl = gitRemote ? `https://github.com/${gitRemote}/tree/main/${pluginMeta.folderName}` : null;
 
     return (
@@ -237,15 +237,15 @@ export default function PluginModal({ plugin, onRestartNeeded, onClose, transiti
                         ) : <div />}
                         {!pluginMeta.userPlugin && (
                             <div className={cl("links")}>
-                                {!isEquicordPlugin && (
+                                {sourceInfo.websiteUrl && (
                                     <WebsiteButton
-                                        text="Website"
-                                        href={`https://vencord.dev/plugins/${plugin.name}`}
+                                        text={sourceInfo.websiteButtonText ?? "Website"}
+                                        href={sourceInfo.websiteUrl}
                                     />
                                 )}
                                 {sourceUrl && (
                                     <GithubButton
-                                        text={isEquicordPlugin ? `${BRAND_NAME} Source` : "Source Code"}
+                                        text={sourceInfo.sourceButtonText}
                                         href={sourceUrl}
                                     />
                                 )}

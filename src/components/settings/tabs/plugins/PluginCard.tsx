@@ -8,7 +8,6 @@ import { showNotice } from "@api/Notices";
 import { isPluginEnabled, pluginRequiresRestart, startDependenciesRecursive, startPlugin, stopPlugin } from "@api/PluginManager";
 import { CogWheel, InfoIcon } from "@components/Icons";
 import { AddonCard } from "@components/settings/AddonCard";
-import { BRAND_NAME } from "@shared/branding";
 import { classNameFactory } from "@utils/css";
 import { Logger } from "@utils/Logger";
 import { OptionType, Plugin } from "@utils/types";
@@ -18,19 +17,10 @@ import { Settings } from "Vencord";
 import { PluginMeta } from "~plugins";
 
 import { openPluginModal } from "./PluginModal";
+import { getPluginSourceInfo } from "./pluginSource";
 
 const logger = new Logger("PluginCard");
 const cl = classNameFactory("vc-plugins-");
-
-const makeBadgeDataUrl = (label: string, bg: string, fg: string) => {
-    const svg = [
-        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">',
-        `<rect width="32" height="32" rx="10" fill="${bg}"/>`,
-        `<text x="16" y="21" text-anchor="middle" font-family="Georgia, serif" font-size="16" font-weight="700" fill="${fg}">${label}</text>`,
-        "</svg>",
-    ].join("");
-    return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
-};
 
 interface PluginCardProps extends React.HTMLProps<HTMLDivElement> {
     plugin: Plugin;
@@ -44,10 +34,8 @@ interface PluginCardProps extends React.HTMLProps<HTMLDivElement> {
 export function PluginCard({ plugin, disabled, onRestartNeeded, onMouseEnter, onMouseLeave, isNew }: PluginCardProps) {
     const settings = Settings.plugins[plugin.name];
     const pluginMeta = PluginMeta[plugin.name];
-    const isEquicordPlugin = pluginMeta.folderName.startsWith("src/equicordplugins/") ?? false;
-    const isVencordPlugin = pluginMeta.folderName.startsWith("src/plugins/") ?? false;
     const isUserPlugin = pluginMeta?.userPlugin ?? false;
-    const isModifiedPlugin = plugin.isModified ?? false;
+    const sourceInfo = getPluginSourceInfo(pluginMeta?.folderName, isUserPlugin, plugin.isModified ?? false);
 
     const isEnabled = () => isPluginEnabled(plugin.name);
 
@@ -101,50 +89,19 @@ export function PluginCard({ plugin, disabled, onRestartNeeded, onMouseEnter, on
         settings.enabled = !wasEnabled;
     }
 
-    const pluginInfo = [
-        {
-            condition: isModifiedPlugin,
-            src: makeBadgeDataUrl("M", "#f4bd50", "#23150d"),
-            alt: "Modified",
-            title: "Modified upstream plugin"
-        },
-        {
-            condition: isEquicordPlugin,
-            src: makeBadgeDataUrl("K", "#7b1e2e", "#fff4e0"),
-            alt: BRAND_NAME,
-            title: `${BRAND_NAME} Plugin`
-        },
-        {
-            condition: isVencordPlugin,
-            src: makeBadgeDataUrl("V", "#4c6586", "#eef5ff"),
-            alt: "Vencord",
-            title: "Vencord Plugin"
-        },
-        {
-            condition: isUserPlugin,
-            src: makeBadgeDataUrl("U", "#5f7f1d", "#f4ffe0"),
-            alt: "User",
-            title: "User Plugin"
-        }
-    ];
-
-    const pluginDetails = pluginInfo.find(p => p.condition);
-
-    const sourceBadge = pluginDetails ? (
+    const sourceBadge = (
         <img
-            src={pluginDetails.src}
-            alt={pluginDetails.alt}
+            src={sourceInfo.badgeSrc}
+            alt={sourceInfo.badgeAlt}
             className={cl("source")}
         />
-    ) : null;
-
-    const tooltip = pluginDetails?.title || "Unknown Plugin";
+    );
 
     return (
         <AddonCard
             name={plugin.name}
             sourceBadge={sourceBadge}
-            tooltip={tooltip}
+            tooltip={sourceInfo.tooltip}
             description={plugin.description}
             isNew={isNew}
             enabled={isEnabled()}

@@ -45,6 +45,7 @@ import Plugins, { ExcludedPlugins, PluginMeta } from "~plugins";
 import { PluginCard } from "./PluginCard";
 import { openWarningModal } from "./PluginModal";
 import { StockPluginsCard, UserPluginsCard } from "./PluginStatCards";
+import { getPluginSourceId } from "./pluginSource";
 import { UIElementsButton } from "./UIElements";
 
 export const cl = classNameFactory("vc-plugins-");
@@ -101,6 +102,7 @@ const enum SearchStatus {
     ALL,
     ENABLED,
     DISABLED,
+    KAMIDERE,
     EQUICORD,
     VENCORD,
     NEW,
@@ -215,6 +217,7 @@ export default function PluginSettings() {
     const pluginFilter = useCallback((plugin: typeof Plugins[keyof typeof Plugins], newPluginsSet: Set<string> | null) => {
         const { status } = searchValue;
         const enabled = isPluginEnabled(plugin.name);
+        const sourceId = getPluginSourceId(PluginMeta[plugin.name]?.folderName, PluginMeta[plugin.name]?.userPlugin);
 
         switch (status) {
             case SearchStatus.DISABLED:
@@ -223,11 +226,14 @@ export default function PluginSettings() {
             case SearchStatus.ENABLED:
                 if (!enabled) return false;
                 break;
+            case SearchStatus.KAMIDERE:
+                if (sourceId !== "kamidere") return false;
+                break;
             case SearchStatus.EQUICORD:
-                if (!PluginMeta[plugin.name].folderName.startsWith("src/equicordplugins/")) return false;
+                if (sourceId !== "equicord") return false;
                 break;
             case SearchStatus.VENCORD:
-                if (!PluginMeta[plugin.name].folderName.startsWith("src/plugins/")) return false;
+                if (sourceId !== "vencord") return false;
                 break;
             case SearchStatus.NEW:
                 if (!newPluginsSet?.has(plugin.name)) return false;
@@ -418,7 +424,8 @@ export default function PluginSettings() {
                                 { label: "Show All", value: SearchStatus.ALL, default: true },
                                 { label: "Show Enabled", value: SearchStatus.ENABLED },
                                 { label: "Show Disabled", value: SearchStatus.DISABLED },
-                                { label: `Show ${BRAND_NAME}`, value: SearchStatus.EQUICORD },
+                                { label: `Show ${BRAND_NAME}`, value: SearchStatus.KAMIDERE },
+                                { label: "Show Equicord", value: SearchStatus.EQUICORD },
                                 { label: "Show Vencord", value: SearchStatus.VENCORD },
                                 { label: "Show New", value: SearchStatus.NEW },
                                 hasUserPlugins && { label: "Show UserPlugins", value: SearchStatus.USER_PLUGINS },

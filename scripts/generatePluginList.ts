@@ -26,16 +26,19 @@ import { getEntryPoint, isPluginFile, parseDevs, parseEquicordDevs, parseFile, P
     const args = process.argv.slice(2);
 
     const equicordFlag = args.includes("--equicord");
+    const kamidereFlag = args.includes("--kamidere");
     const vencordFlag = args.includes("--vencord");
 
     let dirs: string[];
 
     if (equicordFlag) {
         dirs = ["src/equicordplugins"];
+    } else if (kamidereFlag) {
+        dirs = ["src/kamidereplugins"];
     } else if (vencordFlag) {
         dirs = ["src/plugins", "src/plugins/_core"];
     } else {
-        dirs = ["src/plugins", "src/plugins/_core", "src/equicordplugins"];
+        dirs = ["src/plugins", "src/plugins/_core", "src/equicordplugins", "src/kamidereplugins"];
     }
 
     const outputPath = args.find(a => !a.startsWith("--")) ?? null;
