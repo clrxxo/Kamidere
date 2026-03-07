@@ -15,7 +15,7 @@ import { classNameFactory } from "@utils/css";
 import { Margins } from "@utils/margins";
 import { closeModal, ModalCloseButton, ModalContent, ModalFooter, ModalHeader, ModalProps, ModalRoot, ModalSize, openModal } from "@utils/modal";
 import { sleep } from "@utils/misc";
-import { Alerts, ChannelStore, MessageActions, NavigationRouter, React, Select, Toasts, UserStore, UserUtils, useStateFromStores } from "@webpack/common";
+import { Alerts, ChannelStore, MessageActions, NavigationRouter, React, Select, TextInput, Toasts, UserStore, UserUtils, useStateFromStores } from "@webpack/common";
 
 import { clearSentTrailRecords, removeSentTrailRecord, useSentTrailRecords } from "./store";
 import { parseProtectedDmChannels, parseProtectedDmUserIds, settings, SendTrailPurgeTarget } from "./settings";
@@ -547,30 +547,24 @@ function SendTrailConfigModal({
                 <div className={cl("config-manual-row")}>
                     <div className={cl("config-field", "config-manual-field")}>
                         <span className={cl("field-label")}>Discord User ID</span>
-                        <label className={cl("config-id-shell")}>
-                            <input
-                                className={cl("config-id-input")}
-                                type="text"
-                                inputMode="numeric"
-                                autoComplete="off"
-                                autoCorrect="off"
-                                autoCapitalize="off"
-                                value={manualProtectedDmUserId}
-                                placeholder="Add a friend by user ID"
-                                style={{
-                                    color: "var(--text-normal)",
-                                    WebkitTextFillColor: "var(--text-normal)",
-                                    caretColor: "var(--text-normal)",
-                                }}
-                                onChange={event => setManualProtectedDmUserId(event.currentTarget.value)}
-                                onKeyDown={event => {
-                                    if (event.key !== "Enter") return;
-                                    event.preventDefault();
-                                    addProtectedDmUser();
-                                }}
-                                spellCheck={false}
-                            />
-                        </label>
+                        <TextInput
+                            className={cl("config-id-input")}
+                            type="text"
+                            inputMode="numeric"
+                            autoComplete="off"
+                            autoCorrect="off"
+                            autoCapitalize="off"
+                            value={manualProtectedDmUserId}
+                            placeholder="Add a friend by user ID"
+                            onChange={setManualProtectedDmUserId}
+                            onKeyDown={event => {
+                                if (event.key !== "Enter") return;
+                                event.preventDefault();
+                                addProtectedDmUser();
+                            }}
+                            spellCheck={false}
+                            maxLength={null}
+                        />
                     </div>
 
                     <Button

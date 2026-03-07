@@ -918,45 +918,29 @@
     flex: 1 1 auto;
 }
 
-.vc-send-trail-config-id-shell {
-    display: flex;
-    align-items: center;
-    min-height: 40px;
-    padding: 0 12px;
-    border: 1px solid var(--vc-send-trail-border);
-    border-radius: 8px;
-    background: color-mix(in oklab, var(--background-primary) 60%, var(--background-secondary) 40%);
-    box-shadow: inset 0 1px 0 rgb(255 255 255 / 3%);
-}
-
-.vc-send-trail-config-id-shell:focus-within {
-    border-color: color-mix(in oklab, var(--vc-send-trail-accent) 34%, var(--vc-send-trail-border) 66%);
-    box-shadow: 0 0 0 1px rgb(244 189 106 / 12%);
-}
-
 .vc-send-trail-config-id-input {
     width: 100%;
-    min-width: 0;
-    padding: 0;
-    border: 0;
-    background: transparent;
+}
+
+.vc-send-trail-config-id-input input,
+.vc-send-trail-config-id-input [class*="input"],
+.vc-send-trail-config-id-input [class*="inner"] {
     color: var(--text-normal) !important;
     -webkit-text-fill-color: var(--text-normal) !important;
     caret-color: var(--text-normal) !important;
-    font: inherit;
-    outline: none;
 }
 
-.vc-send-trail-config-id-input::placeholder {
+.vc-send-trail-config-id-input input::placeholder,
+.vc-send-trail-config-id-input [class*="input"]::placeholder {
     color: var(--text-muted);
 }
 
 .vc-send-trail-search-input:-webkit-autofill,
 .vc-send-trail-search-input:-webkit-autofill:hover,
 .vc-send-trail-search-input:-webkit-autofill:focus,
-.vc-send-trail-config-id-input:-webkit-autofill,
-.vc-send-trail-config-id-input:-webkit-autofill:hover,
-.vc-send-trail-config-id-input:-webkit-autofill:focus {
+.vc-send-trail-config-id-input input:-webkit-autofill,
+.vc-send-trail-config-id-input input:-webkit-autofill:hover,
+.vc-send-trail-config-id-input input:-webkit-autofill:focus {
     -webkit-text-fill-color: var(--text-normal) !important;
     caret-color: var(--text-normal) !important;
     transition: background-color 99999s ease-in-out 0s;
