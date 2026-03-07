@@ -74,7 +74,7 @@
     margin-top: 12px;
     border: 1px solid var(--vc-send-trail-border);
     background: var(--vc-send-trail-surface);
-    border-radius: 10px;
+    border-radius: 8px;
 }
 
 .vc-send-trail-toolbar-topline,
@@ -131,7 +131,7 @@
 .vc-send-trail-filter-panel {
     padding: 14px;
     border: 1px solid var(--vc-send-trail-border);
-    border-radius: 10px;
+    border-radius: 8px;
     background: color-mix(in oklab, var(--background-secondary) 96%, #fff 4%);
 }
 
@@ -189,7 +189,7 @@
     margin-top: 12px;
     padding: 16px 18px;
     border: 1px solid var(--vc-send-trail-border);
-    border-radius: 10px;
+    border-radius: 8px;
     background: var(--vc-send-trail-surface);
 }
 
@@ -214,7 +214,7 @@
     justify-content: center;
     width: 42px;
     height: 42px;
-    border-radius: 12px;
+    border-radius: 8px;
     background: var(--vc-send-trail-surface-alt);
     flex: 0 0 42px;
 }
@@ -428,7 +428,7 @@
 .vc-send-trail-config-switch-row {
     padding: 14px 16px;
     border: 1px solid var(--vc-send-trail-border);
-    border-radius: 12px;
+    border-radius: 8px;
     background: var(--vc-send-trail-surface-alt);
     align-items: flex-start;
 }
