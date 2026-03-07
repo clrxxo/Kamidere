@@ -128,6 +128,23 @@ export async function clearSentTrailRecordsWhere(
     emit();
 }
 
+export async function removeSentTrailRecord(userId: string | null, channelId: string, messageId: string) {
+    if (!userId) return;
+
+    await DataStore.update(getStorageKey(userId), (existing: SentTrailRecord[] | undefined) =>
+        (existing ?? []).filter(record => !(record.channelId === channelId && record.messageId === messageId)),
+    );
+
+    emit();
+}
+
+export async function removeSentTrailRecordsWhere(
+    userId: string | null,
+    predicate: (record: SentTrailRecord) => boolean,
+) {
+    await clearSentTrailRecordsWhere(userId, predicate);
+}
+
 export function useSentTrailRecords(userId: string | null) {
     const [signal, setSignal] = React.useReducer(value => value + 1, 0);
 

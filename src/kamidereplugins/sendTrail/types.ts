@@ -57,7 +57,14 @@ export interface MessageUpdatePayload {
     message: Partial<Message> & Pick<Message, "id" | "channel_id">;
 }
 
+export interface MessageDeletePayload {
+    type: "MESSAGE_DELETE";
+    channelId: string;
+    id: string;
+}
+
 export interface MediaExtractionInput {
+    content?: string;
     attachments?: MessageAttachment[];
     embeds?: Embed[];
 }

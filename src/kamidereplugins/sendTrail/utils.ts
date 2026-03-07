@@ -6,6 +6,7 @@ import type { MediaExtractionInput, SentTrailMediaItem, SentTrailMediaKind, Sent
 
 const IMAGE_EXTENSIONS = [".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".avif", ".svg"];
 const VIDEO_EXTENSIONS = [".mp4", ".webm", ".mov", ".m4v", ".mkv", ".gifv"];
+const URL_REGEX = /https?:\/\/[^\s<>()]+/gi;
 
 function getFileExtension(value?: string) {
     if (!value) return "";
@@ -66,11 +67,8 @@ export function getRecordPreview(content?: string) {
 export function makeUploadSignature({ uploads = [] }: UploadSignatureInput) {
     return uploads
         .map(upload => {
-            const size = typeof upload.getSize === "function"
-                ? upload.getSize()
-                : upload.preCompressionSize ?? upload.currentSize ?? 0;
             const kind = upload.isVideo ? "video" : upload.isImage ? "image" : "file";
-            return `${kind}:${upload.filename ?? ""}:${upload.mimeType ?? ""}:${size}`;
+            return `${kind}:${upload.filename ?? ""}:${upload.mimeType ?? ""}`;
         })
         .sort()
         .join("|");
@@ -80,13 +78,38 @@ export function makeAttachmentSignature(attachments: MessageAttachment[] = []) {
     return attachments
         .map(attachment => {
             const kind = inferMediaKind(attachment.filename, attachment.content_type) ?? "file";
-            return `${kind}:${attachment.filename}:${attachment.content_type ?? ""}:${attachment.size}`;
+            return `${kind}:${attachment.filename}:${attachment.content_type ?? ""}`;
         })
         .sort()
         .join("|");
 }
 
-export function collectMediaItems({ attachments = [], embeds = [] }: MediaExtractionInput) {
+function extractContentMediaItems(content?: string) {
+    const items: SentTrailMediaItem[] = [];
+    if (!content) return items;
+
+    const urls = content.match(URL_REGEX) ?? [];
+    for (const rawUrl of urls) {
+        const url = rawUrl.replace(/[),.!?]+$/g, "");
+        const kind = inferMediaKind(url);
+        if (!kind) continue;
+
+        items.push({
+            kind,
+            source: "embed",
+            url,
+            contentType: kind === "image" ? "image/*" : "video/*",
+        });
+    }
+
+    return items;
+}
+
+export function hasMediaLinks(content?: string) {
+    return extractContentMediaItems(content).length > 0;
+}
+
+export function collectMediaItems({ content, attachments = [], embeds = [] }: MediaExtractionInput) {
     const items: SentTrailMediaItem[] = [];
 
     for (const attachment of attachments) {
@@ -126,6 +149,7 @@ export function collectMediaItems({ attachments = [], embeds = [] }: MediaExtrac
         }
     }
 
+    items.push(...extractContentMediaItems(content));
     return dedupeMedia(items);
 }
 

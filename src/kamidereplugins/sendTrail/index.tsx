@@ -2,17 +2,18 @@ import type { MessageObject, MessageOptions } from "@api/MessageEvents";
 import { ClockIcon } from "@components/Icons";
 import SettingsPlugin from "@plugins/_core/settings";
 import { Devs } from "@utils/constants";
+import { sleep } from "@utils/misc";
 import { removeFromArray } from "@utils/misc";
 import definePlugin from "@utils/types";
 import { ChannelStore, GuildStore, MessageStore, UserStore } from "@webpack/common";
 
 import SendTrailTab from "./SendTrailTab";
-import { appendSentTrailRecord, mergeSentTrailRecordMedia } from "./store";
-import type { MessageCreatePayload, MessageUpdatePayload, PendingSendDraft, SentTrailRecord } from "./types";
-import { buildJumpLink, collectMediaItems, getMessageTimestamp, getRecordPreview, makeAttachmentSignature, makeUploadSignature, normalizeContent } from "./utils";
+import { appendSentTrailRecord, mergeSentTrailRecordMedia, removeSentTrailRecord } from "./store";
+import type { MessageCreatePayload, MessageDeletePayload, MessageUpdatePayload, PendingSendDraft, SentTrailRecord } from "./types";
+import { buildJumpLink, collectMediaItems, getMessageTimestamp, getRecordPreview, hasMediaLinks, makeAttachmentSignature, makeUploadSignature, normalizeContent } from "./utils";
 
 const DRAFT_TTL_MS = 20_000;
-const MIN_MATCH_SCORE = 5;
+const MIN_MATCH_SCORE = 4;
 
 let draftCounter = 0;
 const pendingDrafts = new Map<string, PendingSendDraft>();
@@ -39,7 +40,7 @@ function createPendingDraft(channelId: string, messageObj: MessageObject, option
         content,
         normalizedContent,
         hasText: normalizedContent.length > 0,
-        mediaHint: (options.uploads?.length ?? 0) > 0,
+        mediaHint: (options.uploads?.length ?? 0) > 0 || hasMediaLinks(content),
         uploadSignature: makeUploadSignature({ uploads: options.uploads }),
         replyMessageId: options.replyOptions?.messageReference?.message_id,
     });
@@ -55,11 +56,12 @@ function getDraftScore(draft: PendingSendDraft, payload: MessageCreatePayload) {
     const normalizedContent = normalizeContent(message.content);
     const attachmentSignature = makeAttachmentSignature(message.attachments ?? []);
     const media = collectMediaItems({
+        content: message.content,
         attachments: message.attachments ?? [],
         embeds: message.embeds ?? [],
     });
 
-    let score = 0;
+    let score = 2;
 
     if (draft.normalizedContent === normalizedContent) {
         score += 6;
@@ -79,6 +81,10 @@ function getDraftScore(draft: PendingSendDraft, payload: MessageCreatePayload) {
 
     if (draft.mediaHint === (media.length > 0)) {
         score += 1;
+    }
+
+    if (draft.mediaHint && media.length > 0) {
+        score += 2;
     }
 
     if (draft.hasText === (normalizedContent.length > 0)) {
@@ -113,11 +119,12 @@ function buildRecord(payload: MessageCreatePayload, draft: PendingSendDraft): Se
     const guildId = payload.guildId ?? channel?.guild_id ?? "@me";
     const guild = guildId !== "@me" ? GuildStore.getGuild(guildId) : null;
     const timestamp = getMessageTimestamp(message);
+    const content = message.content ?? draft.content ?? "";
     const media = collectMediaItems({
+        content,
         attachments: message.attachments ?? [],
         embeds: message.embeds ?? [],
     });
-    const content = message.content ?? draft.content ?? "";
     const normalizedContent = normalizeContent(content);
 
     return {
@@ -147,6 +154,7 @@ async function maybeEnrichRecord(payload: MessageUpdatePayload) {
     if (!message?.author || message.author.id !== currentUserId) return;
 
     const media = collectMediaItems({
+        content: message.content,
         attachments: message.attachments ?? [],
         embeds: message.embeds ?? [],
     });
@@ -167,6 +175,45 @@ async function maybeEnrichRecord(payload: MessageUpdatePayload) {
             guildNameSnapshot: guild?.name ?? undefined,
         },
     );
+}
+
+async function enrichFromStore(channelId: string, messageId: string, guildId?: string) {
+    const message = MessageStore.getMessage(channelId, messageId);
+    if (!message) return false;
+
+    const media = collectMediaItems({
+        content: message.content,
+        attachments: message.attachments ?? [],
+        embeds: message.embeds ?? [],
+    });
+    if (!media.length) return false;
+
+    const channel = ChannelStore.getChannel(channelId);
+    const effectiveGuildId = guildId ?? channel?.guild_id ?? "@me";
+    const guild = effectiveGuildId !== "@me" ? GuildStore.getGuild(effectiveGuildId) : null;
+
+    await mergeSentTrailRecordMedia(
+        channelId,
+        messageId,
+        media,
+        {
+            guildId: effectiveGuildId,
+            jumpLink: buildJumpLink(effectiveGuildId, channelId, messageId),
+            channelNameSnapshot: channel?.name ?? undefined,
+            guildNameSnapshot: guild?.name ?? undefined,
+        },
+    );
+
+    return true;
+}
+
+function scheduleEnrichment(channelId: string, messageId: string, guildId?: string) {
+    void (async () => {
+        for (let attempt = 0; attempt < 3; attempt++) {
+            await sleep(900 + attempt * 1200);
+            if (await enrichFromStore(channelId, messageId, guildId)) break;
+        }
+    })();
 }
 
 export default definePlugin({
@@ -212,12 +259,18 @@ export default definePlugin({
             const draft = resolveBestDraft(payload);
             if (!draft) return;
 
-            await appendSentTrailRecord(buildRecord(payload, draft));
+            const record = buildRecord(payload, draft);
+            await appendSentTrailRecord(record);
+            scheduleEnrichment(record.channelId, record.messageId, record.guildId);
         },
 
         async MESSAGE_UPDATE(payload: MessageUpdatePayload) {
             cleanupExpiredDrafts();
             await maybeEnrichRecord(payload);
+        },
+
+        async MESSAGE_DELETE(payload: MessageDeletePayload) {
+            await removeSentTrailRecord(UserStore.getCurrentUser()?.id ?? null, payload.channelId, payload.id);
         },
     },
 });
