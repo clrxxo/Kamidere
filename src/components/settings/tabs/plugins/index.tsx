@@ -51,6 +51,12 @@ import { UIElementsButton } from "./UIElements";
 export const cl = classNameFactory("vc-plugins-");
 export const logger = new Logger("PluginSettings", "#a6d189");
 
+function isDisplayPlugin(plugin: unknown): plugin is typeof Plugins[keyof typeof Plugins] & { name: string; } {
+    return typeof plugin === "object"
+        && plugin !== null
+        && typeof (plugin as { name?: unknown; }).name === "string";
+}
+
 function showErrorToast(message: string) {
     Toasts.show({
         message,
@@ -181,7 +187,7 @@ export default function PluginSettings() {
     const depMap = useMemo(() => {
         const o = {} as Record<string, string[]>;
         for (const plugin in Plugins) {
-            const deps = Plugins[plugin].dependencies;
+            const deps = Plugins[plugin]?.dependencies;
             if (deps) {
                 for (const dep of deps) {
                     o[dep] ??= [];
@@ -193,6 +199,7 @@ export default function PluginSettings() {
     }, []);
 
     const sortedPlugins = useMemo(() => Object.values(Plugins)
+        .filter(isDisplayPlugin)
         .sort((a, b) => a.name.localeCompare(b.name)), []);
 
     const hasUserPlugins = useMemo(() => !IS_STANDALONE && Object.values(PluginMeta).some(m => m.userPlugin), []);
@@ -248,9 +255,11 @@ export default function PluginSettings() {
 
         if (!search.length) return true;
 
+        const description = typeof plugin.description === "string" ? plugin.description.toLowerCase() : "";
+
         return (
             plugin.name.toLowerCase().includes(search.replace(/\s+/g, "")) ||
-            plugin.description.toLowerCase().includes(search) ||
+            description.includes(search) ||
             plugin.tags?.some(t => t.toLowerCase().includes(search))
         );
     }, [searchValue, search]);
@@ -285,12 +294,12 @@ export default function PluginSettings() {
 
             if (!pluginFilter(p, newPluginsSet)) continue;
 
-            const isRequired = p.required || p.isDependency || depMap[p.name]?.some(d => settings.plugins[d].enabled);
+            const isRequired = p.required || p.isDependency || depMap[p.name]?.some(d => settings.plugins[d]?.enabled);
 
             if (isRequired) {
                 const tooltipText = p.required || !depMap[p.name]
                     ? `This plugin is required for ${BRAND_NAME} to function.`
-                    : <PluginDependencyList deps={depMap[p.name]?.filter(d => settings.plugins[d].enabled)} />;
+                    : <PluginDependencyList deps={depMap[p.name]?.filter(d => settings.plugins[d]?.enabled)} />;
 
                 requiredPlugins.push(
                     <Tooltip text={tooltipText} key={p.name}>
@@ -324,16 +333,19 @@ export default function PluginSettings() {
         let restartNeeded = false;
 
         for (const plugin of enabledPlugins) {
+            const pluginDef = Plugins[plugin];
+            if (!isDisplayPlugin(pluginDef)) continue;
+
             const pluginSettings = settings.plugins[plugin];
 
-            if (Plugins[plugin].patches?.length) {
+            if (pluginDef.patches?.length) {
                 pluginSettings.enabled = false;
                 changes.handleChange(plugin);
                 restartNeeded = true;
                 continue;
             }
 
-            const result = stopPlugin(Plugins[plugin]);
+            const result = stopPlugin(pluginDef);
 
             if (!result) {
                 logger.error(`Error while stopping plugin ${plugin}`);
@@ -362,12 +374,12 @@ export default function PluginSettings() {
 
     // Code directly taken from supportHelper.tsx
     const { totalStockPlugins, totalUserPlugins, enabledStockPlugins, enabledUserPlugins, enabledPlugins } = useMemo(() => {
-        const isApiPlugin = (plugin: string) => plugin.endsWith("API") || Plugins[plugin].required;
+        const isApiPlugin = (plugin: string) => plugin.endsWith("API") || Boolean(Plugins[plugin]?.required);
 
         const totalPlugins = Object.keys(Plugins).filter(p => !isApiPlugin(p));
         const enabledPlugins = Object.keys(Plugins).filter(p => isPluginEnabled(p) && !isApiPlugin(p));
 
-        const totalStockPlugins = totalPlugins.filter(p => !PluginMeta[p].userPlugin && !Plugins[p].hidden).length;
+        const totalStockPlugins = totalPlugins.filter(p => !PluginMeta[p].userPlugin && !Plugins[p]?.hidden).length;
         const totalUserPlugins = totalPlugins.filter(p => PluginMeta[p].userPlugin).length;
         const enabledStockPlugins = enabledPlugins.filter(p => !PluginMeta[p].userPlugin).length;
         const enabledUserPlugins = enabledPlugins.filter(p => PluginMeta[p].userPlugin).length;

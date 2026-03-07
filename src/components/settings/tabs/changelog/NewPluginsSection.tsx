@@ -21,6 +21,12 @@ import Plugins from "~plugins";
 
 const cl = classNameFactory("vc-changelog-");
 
+function isChangelogPlugin(plugin: unknown): plugin is typeof Plugins[keyof typeof Plugins] & { name: string; } {
+    return typeof plugin === "object"
+        && plugin !== null
+        && typeof (plugin as { name?: unknown; }).name === "string";
+}
+
 interface NewPluginsSectionProps {
     newPlugins: string[];
     onPluginToggle?: (pluginName: string, enabled: boolean) => void;
@@ -37,7 +43,7 @@ export function NewPluginsSection({
     const depMap = React.useMemo(() => {
         const o = {} as Record<string, string[]>;
         for (const plugin in Plugins) {
-            const deps = Plugins[plugin].dependencies;
+            const deps = Plugins[plugin]?.dependencies;
             if (deps) {
                 for (const dep of deps) {
                     o[dep] ??= [];
@@ -51,7 +57,8 @@ export function NewPluginsSection({
     const mapPlugins = (array: string[]) =>
         array
             .map(pn => Plugins[pn])
-            .filter(p => p && !p.hidden)
+            .filter(isChangelogPlugin)
+            .filter(p => !p.hidden)
             .sort((a, b) => a.name.localeCompare(b.name));
 
     const sortedPlugins = React.useMemo(
@@ -92,14 +99,14 @@ export function NewPluginsSection({
                     const isRequired =
                         plugin.required ||
                         depMap[plugin.name]?.some(
-                            d => settings.plugins[d].enabled,
+                            d => settings.plugins[d]?.enabled,
                         ) ||
                         plugin.name.endsWith("API");
                     const tooltipText = plugin.required
                         ? `This plugin is required for ${BRAND_NAME} to function.`
                         : makeDependencyList(
                             depMap[plugin.name]?.filter(
-                                d => settings.plugins[d].enabled,
+                                d => settings.plugins[d]?.enabled,
                             ),
                         );
 
@@ -201,13 +208,13 @@ function CompactPluginCard({
 
     const isRequired =
         plugin.required ||
-        depMap[plugin.name]?.some(d => settings.plugins[d].enabled);
+        depMap[plugin.name]?.some(d => settings.plugins[d]?.enabled);
 
     const tooltipText = plugin.required
         ? `This plugin is required for ${BRAND_NAME} to function.`
         : depMap[plugin.name]?.length > 0
             ? `This plugin is required by: ${depMap[plugin.name]
-                ?.filter(d => settings.plugins[d].enabled)
+                ?.filter(d => settings.plugins[d]?.enabled)
                 .join(", ")}`
             : null;
 
@@ -241,7 +248,7 @@ export function NewPluginsCompact({
     const depMap = React.useMemo(() => {
         const o = {} as Record<string, string[]>;
         for (const plugin in Plugins) {
-            const deps = Plugins[plugin].dependencies;
+            const deps = Plugins[plugin]?.dependencies;
             if (deps) {
                 for (const dep of deps) {
                     o[dep] ??= [];

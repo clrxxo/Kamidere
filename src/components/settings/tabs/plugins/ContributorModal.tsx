@@ -26,6 +26,13 @@ import { PluginCard } from "./PluginCard";
 
 const cl = classNameFactory("vc-author-modal-");
 
+function isContributorPlugin(plugin: unknown): plugin is typeof Plugins[keyof typeof Plugins] & { name: string; authors: NonNullable<(typeof Plugins)[keyof typeof Plugins]["authors"]>; } {
+    return typeof plugin === "object"
+        && plugin !== null
+        && typeof (plugin as { name?: unknown; }).name === "string"
+        && Array.isArray((plugin as { authors?: unknown; }).authors);
+}
+
 export function openContributorModal(user: User) {
     openModal(modalProps =>
         <ModalRoot {...modalProps}>
@@ -50,7 +57,7 @@ function ContributorModal({ user }: { user: User; }) {
     const website = profile?.connectedAccounts?.find(a => a.type === "domain")?.name;
 
     const plugins = useMemo(() => {
-        const allPlugins = Object.values(Plugins);
+        const allPlugins = Object.values(Plugins).filter(isContributorPlugin);
         const pluginsByAuthor = (VencordDevsById[user.id] || EquicordDevsById[user.id])
             ? allPlugins.filter(p => p.authors.includes(VencordDevsById[user.id] || EquicordDevsById[user.id]))
             : allPlugins.filter(p =>
