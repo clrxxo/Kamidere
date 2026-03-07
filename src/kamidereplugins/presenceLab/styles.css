@@ -1,3 +1,88 @@
+.vc-presence-lab-shell {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1.58fr) 360px;
+    gap: 18px;
+    margin-top: 20px;
+    isolation: isolate;
+}
+
+.vc-presence-lab-shell::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: 18px;
+    background:
+        radial-gradient(circle at center, rgba(226, 177, 90, 0.08), transparent 36%),
+        radial-gradient(circle, rgba(255, 255, 255, 0.12) 1px, transparent 1px);
+    background-size: 100% 100%, 16px 16px;
+    background-position: center, 0 0;
+    opacity: 0.48;
+    pointer-events: none;
+}
+
+.vc-presence-lab-shell > * {
+    position: relative;
+    z-index: 1;
+}
+
+.vc-presence-lab-shell > :nth-child(1),
+.vc-presence-lab-shell > :nth-child(2),
+.vc-presence-lab-shell > :nth-child(3),
+.vc-presence-lab-overview-grid {
+    grid-column: 1 / -1;
+}
+
+.vc-presence-lab-shell > :first-child {
+    overflow: hidden;
+    border: 1px solid rgba(226, 177, 90, 0.14);
+    box-shadow: 0 26px 64px rgba(0, 0, 0, 0.28);
+}
+
+.vc-presence-lab-overview-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.58fr) 360px;
+    gap: 18px;
+    margin-top: 0;
+}
+
+.vc-presence-lab-overview-stack,
+.vc-presence-lab-runtime-card,
+.vc-presence-lab-panel-card,
+.vc-presence-lab-session-card,
+.vc-presence-lab-history-card,
+.vc-presence-lab-cadence-strip {
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 14px;
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 22%),
+        linear-gradient(180deg, rgba(226, 177, 90, 0.035), transparent 55%),
+        color-mix(in srgb, var(--background-secondary) 92%, black 8%);
+    box-shadow:
+        0 14px 40px rgba(0, 0, 0, 0.22),
+        inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.vc-presence-lab-roster-grid {
+    grid-column: 2;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 18px;
+    margin-top: 0;
+}
+
+.vc-presence-lab-session-card {
+    grid-column: 2;
+    margin-top: 0;
+}
+
+.vc-presence-lab-history-card {
+    grid-column: 1;
+    margin-top: 0;
+    min-height: 680px;
+}
+
 .vc-presence-lab-hero-tags {
     display: flex;
     flex-wrap: wrap;
@@ -5,39 +90,123 @@
     margin-top: 18px;
 }
 
-.vc-presence-lab-hero-tag {
-    padding: 6px 12px;
-    border: 1px solid rgba(255, 255, 255, 0.12);
+.vc-presence-lab-hero-tag,
+.vc-presence-lab-cadence-badge,
+.vc-presence-lab-section-chip,
+.vc-presence-lab-session-badge,
+.vc-presence-lab-session-group-count,
+.vc-presence-lab-session-time,
+.vc-presence-lab-identity-meta,
+.vc-presence-lab-pair-minutes,
+.vc-presence-lab-session-duration-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 10px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 8px;
-    background: rgba(12, 14, 18, 0.34);
-    color: var(--header-primary);
-    font-size: 12px;
+    background: rgba(255, 255, 255, 0.035);
+    color: var(--text-muted);
+    font-size: 11px;
     font-weight: 700;
-    letter-spacing: 0.03em;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
 }
 
-.vc-presence-lab-overview-grid,
-.vc-presence-lab-roster-grid {
-    display: grid;
-    gap: 18px;
-    margin-top: 20px;
+.vc-presence-lab-hero-tag,
+.vc-presence-lab-cadence-badge {
+    color: #f2d39b;
+    border-color: rgba(226, 177, 90, 0.22);
+    background: rgba(226, 177, 90, 0.08);
 }
 
-.vc-presence-lab-overview-grid {
-    grid-template-columns: minmax(0, 1.8fr) minmax(320px, 0.95fr);
+.vc-presence-lab-cadence-strip {
+    padding: 20px;
 }
 
-.vc-presence-lab-overview-stack,
-.vc-presence-lab-runtime-card,
-.vc-presence-lab-panel-card,
-.vc-presence-lab-session-card,
-.vc-presence-lab-history-card {
-    border: 1px solid var(--border-subtle);
-    border-radius: 12px;
+.vc-presence-lab-cadence-strip-top,
+.vc-presence-lab-cadence-strip-bottom,
+.vc-presence-lab-section-head,
+.vc-presence-lab-history-toolbar,
+.vc-presence-lab-inline-actions,
+.vc-presence-lab-toggle-row,
+.vc-presence-lab-runtime-footer,
+.vc-presence-lab-session-entry-top,
+.vc-presence-lab-session-entry-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+}
+
+.vc-presence-lab-cadence-icons {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.vc-presence-lab-cadence-icon-shell {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.03);
+    color: var(--text-muted);
+}
+
+.vc-presence-lab-cadence-icon-shell.active {
+    color: var(--header-primary);
+    border-color: rgba(226, 177, 90, 0.26);
     background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 28%),
-        var(--background-secondary);
-    box-shadow: 0 18px 48px rgba(0, 0, 0, 0.18);
+        linear-gradient(180deg, rgba(226, 177, 90, 0.18), rgba(226, 177, 90, 0.06)),
+        rgba(255, 255, 255, 0.02);
+    box-shadow: 0 10px 22px rgba(226, 177, 90, 0.16);
+}
+
+.vc-presence-lab-cadence-copy {
+    flex: 1;
+    min-width: 0;
+}
+
+.vc-presence-lab-cadence-strip-bottom {
+    margin-top: 16px;
+}
+
+.vc-presence-lab-cadence-time-label {
+    color: var(--text-normal);
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.vc-presence-lab-cadence-track {
+    position: relative;
+    flex: 1;
+    height: 6px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.12);
+}
+
+.vc-presence-lab-cadence-track-fill {
+    position: absolute;
+    inset: 0 auto 0 0;
+    border-radius: inherit;
+    background: linear-gradient(90deg, #f0ba62, #e7a449);
+    box-shadow: 0 0 18px rgba(240, 186, 98, 0.32);
+}
+
+.vc-presence-lab-cadence-thumb {
+    position: absolute;
+    top: 50%;
+    width: 16px;
+    height: 16px;
+    border-radius: 999px;
+    background: #f0ba62;
+    box-shadow: 0 0 22px rgba(240, 186, 98, 0.45);
+    transform: translate(-50%, -50%);
 }
 
 .vc-presence-lab-overview-stack {
@@ -49,7 +218,8 @@
 .vc-presence-lab-metric-grid,
 .vc-presence-lab-gauge-grid,
 .vc-presence-lab-insight-grid,
-.vc-presence-lab-field-grid {
+.vc-presence-lab-field-grid,
+.vc-presence-lab-runtime-stat-grid {
     display: grid;
     gap: 14px;
 }
@@ -74,8 +244,8 @@
 .vc-presence-lab-identity-card,
 .vc-presence-lab-session-entry,
 .vc-presence-lab-empty-card {
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
     background:
         linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 24%),
         rgba(255, 255, 255, 0.02);
@@ -91,11 +261,7 @@
 
 .vc-presence-lab-metric-label,
 .vc-presence-lab-field-label,
-.vc-presence-lab-runtime-label,
-.vc-presence-lab-section-chip,
-.vc-presence-lab-session-badge,
-.vc-presence-lab-session-group-count,
-.vc-presence-lab-identity-meta {
+.vc-presence-lab-runtime-label {
     color: var(--text-muted);
     font-size: 11px;
     font-weight: 700;
@@ -124,6 +290,7 @@
     display: flex;
     align-items: center;
     gap: 14px;
+    min-height: 118px;
 }
 
 .vc-presence-lab-gauge-ring {
@@ -144,7 +311,7 @@
     width: 100%;
     height: 100%;
     border-radius: inherit;
-    background: var(--background-secondary);
+    background: color-mix(in srgb, var(--background-secondary) 94%, black 6%);
 }
 
 .vc-presence-lab-gauge-value {
@@ -162,14 +329,13 @@
 .vc-presence-lab-gauge-label,
 .vc-presence-lab-pair-title,
 .vc-presence-lab-strip-value,
-.vc-presence-lab-session-title,
-.vc-presence-lab-history-summary {
+.vc-presence-lab-session-title {
     color: var(--header-primary);
 }
 
 .vc-presence-lab-strip-card,
 .vc-presence-lab-pair-card {
-    min-height: 220px;
+    min-height: 228px;
 }
 
 .vc-presence-lab-strip-bars {
@@ -194,7 +360,7 @@
     width: 100%;
     min-height: 112px;
     padding: 10px 0;
-    border-radius: 8px;
+    border-radius: 10px;
     background: rgba(255, 255, 255, 0.03);
 }
 
@@ -221,38 +387,15 @@
     margin-top: 14px;
 }
 
-.vc-presence-lab-pair-row,
-.vc-presence-lab-identity-row,
-.vc-presence-lab-session-entry-top,
-.vc-presence-lab-session-entry-footer,
-.vc-presence-lab-section-head,
-.vc-presence-lab-history-toolbar,
-.vc-presence-lab-inline-actions,
-.vc-presence-lab-toggle-row,
-.vc-presence-lab-runtime-footer {
+.vc-presence-lab-pair-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 12px;
-}
-
-.vc-presence-lab-pair-row {
     padding: 12px 14px;
     border: 1px solid rgba(255, 255, 255, 0.05);
     border-radius: 10px;
     background: rgba(255, 255, 255, 0.02);
-}
-
-.vc-presence-lab-pair-minutes,
-.vc-presence-lab-session-duration-chip,
-.vc-presence-lab-section-chip,
-.vc-presence-lab-session-group-count,
-.vc-presence-lab-session-time,
-.vc-presence-lab-identity-meta {
-    padding: 6px 10px;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 8px;
-    background: rgba(255, 255, 255, 0.03);
 }
 
 .vc-presence-lab-runtime-card,
@@ -267,9 +410,7 @@
 }
 
 .vc-presence-lab-runtime-stat-grid {
-    display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 12px;
     margin-top: 18px;
 }
 
@@ -304,9 +445,9 @@
 .vc-presence-lab-search-input {
     width: 100%;
     min-width: 0;
-    border: 1px solid var(--border-subtle);
+    border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 10px;
-    background: rgba(255, 255, 255, 0.02);
+    background: rgba(255, 255, 255, 0.025);
     color: var(--text-normal);
     font-size: 14px;
     outline: none;
@@ -319,9 +460,9 @@
 
 .vc-presence-lab-input:focus,
 .vc-presence-lab-search-input:focus {
-    border-color: rgba(140, 177, 255, 0.65);
-    box-shadow: 0 0 0 3px rgba(140, 177, 255, 0.14);
-    background: rgba(255, 255, 255, 0.025);
+    border-color: rgba(226, 177, 90, 0.45);
+    box-shadow: 0 0 0 3px rgba(226, 177, 90, 0.12);
+    background: rgba(255, 255, 255, 0.03);
 }
 
 .vc-presence-lab-input::placeholder,
@@ -332,10 +473,6 @@
 .vc-presence-lab-toggle-row,
 .vc-presence-lab-runtime-footer {
     margin-top: 18px;
-}
-
-.vc-presence-lab-roster-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .vc-presence-lab-empty-inline {
@@ -353,8 +490,28 @@
     color: #f0c276;
 }
 
+.vc-presence-lab-identity-list {
+    max-height: 280px;
+    overflow: auto;
+    padding-right: 2px;
+}
+
 .vc-presence-lab-identity-card {
     padding: 12px 14px;
+}
+
+.vc-presence-lab-identity-row,
+.vc-presence-lab-identity-title-row,
+.vc-presence-lab-session-entry-route,
+.vc-presence-lab-session-entry-meta,
+.vc-presence-lab-identity-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.vc-presence-lab-identity-row {
+    justify-content: space-between;
 }
 
 .vc-presence-lab-identity-avatar,
@@ -371,15 +528,6 @@
     min-width: 0;
 }
 
-.vc-presence-lab-identity-title-row,
-.vc-presence-lab-session-entry-route,
-.vc-presence-lab-session-entry-meta,
-.vc-presence-lab-identity-controls {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
 .vc-presence-lab-history-toolbar {
     margin-top: 18px;
 }
@@ -390,9 +538,9 @@
     gap: 10px;
     width: 100%;
     padding: 0 12px;
-    border: 1px solid var(--border-subtle);
+    border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 10px;
-    background: rgba(255, 255, 255, 0.02);
+    background: rgba(255, 255, 255, 0.025);
 }
 
 .vc-presence-lab-search-icon {
@@ -471,20 +619,27 @@
     text-align: center;
 }
 
-@media (max-width: 1180px) {
-    .vc-presence-lab-overview-grid,
-    .vc-presence-lab-insight-grid,
+@media (max-width: 1260px) {
+    .vc-presence-lab-shell,
+    .vc-presence-lab-overview-grid {
+        grid-template-columns: 1fr;
+    }
+
     .vc-presence-lab-roster-grid,
+    .vc-presence-lab-session-card,
+    .vc-presence-lab-history-card {
+        grid-column: auto;
+    }
+}
+
+@media (max-width: 980px) {
     .vc-presence-lab-metric-grid,
     .vc-presence-lab-gauge-grid,
+    .vc-presence-lab-insight-grid,
     .vc-presence-lab-runtime-stat-grid,
     .vc-presence-lab-field-grid-three,
     .vc-presence-lab-field-grid-four {
         grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
-    .vc-presence-lab-overview-grid {
-        grid-template-columns: 1fr;
     }
 }
 
@@ -500,15 +655,14 @@
         grid-template-columns: 1fr;
     }
 
-    .vc-presence-lab-strip-bars {
-        gap: 6px;
-    }
-
-    .vc-presence-lab-session-entry-top,
-    .vc-presence-lab-session-entry-footer,
+    .vc-presence-lab-cadence-strip-top,
+    .vc-presence-lab-cadence-strip-bottom,
+    .vc-presence-lab-section-head,
+    .vc-presence-lab-history-toolbar,
     .vc-presence-lab-toggle-row,
     .vc-presence-lab-runtime-footer,
-    .vc-presence-lab-section-head,
+    .vc-presence-lab-session-entry-top,
+    .vc-presence-lab-session-entry-footer,
     .vc-presence-lab-identity-row {
         flex-direction: column;
         align-items: flex-start;

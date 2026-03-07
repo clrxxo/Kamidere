@@ -78,6 +78,14 @@ function normalizeUserId(value: string) {
     return value.trim();
 }
 
+function formatSecondsLabel(seconds: number) {
+    if (seconds < 60) return `${seconds}s`;
+
+    const wholeMinutes = Math.floor(seconds / 60);
+    const remainder = seconds % 60;
+    return remainder ? `${wholeMinutes}m ${remainder}s` : `${wholeMinutes}m`;
+}
+
 function renderSourceLabel(source: PresenceLabIdentitySource) {
     switch (source) {
         case "current":
@@ -509,9 +517,16 @@ function PresenceLabTab() {
             hint: "Default stay duration used when saving a session.",
         },
     ];
+    const averageJitterSeconds = Math.round((data.config.jitterMinSeconds + data.config.jitterMaxSeconds) / 2);
+    const cadenceLeadSeconds = data.config.entryDelaySeconds + averageJitterSeconds;
+    const cadenceTotalSeconds = cadenceLeadSeconds + data.config.dwellMinutes * 60;
+    const cadenceProgress = cadenceTotalSeconds > 0
+        ? Math.min(96, Math.max(8, Math.round((cadenceLeadSeconds / cadenceTotalSeconds) * 100)))
+        : 12;
 
     return (
         <SettingsTab>
+            <div className={cl("shell")}>
             <SpecialCard
                 title="Presence Lab"
                 subtitle="Local operator sandbox"
@@ -531,6 +546,32 @@ function PresenceLabTab() {
             <Notice.Info className={Margins.top20} style={{ width: "100%" }}>
                 Presence Lab is intentionally local-only. Use it for self-owned test accounts, manual notes, and simulated sessions. If you later add private adapters, keep any secrets in local git-ignored files. This page does not send tokens or session data to external services.
             </Notice.Info>
+
+            <Card className={cl("cadence-strip")} defaultPadding>
+                <div className={cl("cadence-strip-top")}>
+                    <div className={cl("cadence-icons")}>
+                        <span className={cl("cadence-icon-shell")}><ClockIcon width={16} height={16} /></span>
+                        <span className={cl("cadence-icon-shell", "active")}><Microphone width={16} height={16} /></span>
+                        <span className={cl("cadence-icon-shell")}><ComponentsIcon width={16} height={16} /></span>
+                    </div>
+
+                    <div className={cl("cadence-copy")}>
+                        <HeadingTertiary className={Margins.reset}>Delay, Jitter, Dwell</HeadingTertiary>
+                        <Paragraph className={cl("section-copy")}>A local timing strip for simulated sessions and manual runtime planning.</Paragraph>
+                    </div>
+
+                    <span className={cl("cadence-badge")}>Local Sandbox</span>
+                </div>
+
+                <div className={cl("cadence-strip-bottom")}>
+                    <span className={cl("cadence-time-label")}>{formatSecondsLabel(cadenceLeadSeconds)}</span>
+                    <div className={cl("cadence-track")}>
+                        <div className={cl("cadence-track-fill")} style={{ width: `${cadenceProgress}%` }} />
+                        <div className={cl("cadence-thumb")} style={{ left: `${cadenceProgress}%` }} />
+                    </div>
+                    <span className={cl("cadence-time-label")}>{formatSecondsLabel(cadenceTotalSeconds)}</span>
+                </div>
+            </Card>
 
             <div className={cl("overview-grid")}>
                 <div className={cl("overview-stack")}>
@@ -873,6 +914,7 @@ function PresenceLabTab() {
                     </div>
                 )}
             </Card>
+            </div>
         </SettingsTab>
     );
 }
