@@ -372,9 +372,9 @@ export default definePlugin({
     },
 
     syncCustomEntrySidebarDecorations() {
-        this.clearCustomEntrySidebarDecorations();
-
         if (!this.customEntries.length) return;
+
+        this.clearCustomEntrySidebarDecorations();
 
         const firstCustomEntryElement = this.customEntries
             .map(entry => this.findSidebarItemElement(entry))
