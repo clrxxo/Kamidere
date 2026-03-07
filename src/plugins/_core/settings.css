@@ -1,0 +1,17 @@
+.vc-kamidere-settings-custom-entry-first {
+    position: relative;
+    margin-top: 10px !important;
+    padding-top: 14px !important;
+}
+
+.vc-kamidere-settings-custom-entry-first::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: var(--background-modifier-accent);
+    opacity: 0.9;
+    pointer-events: none;
+}

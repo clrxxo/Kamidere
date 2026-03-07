@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+import "./settings.css";
+
 import { definePluginSettings } from "@api/Settings";
 import { BackupRestoreIcon, CloudIcon, LogIcon, MainSettingsIcon, PaintbrushIcon, PatchHelperIcon, PluginsIcon, UpdaterIcon } from "@components/Icons";
 import {
@@ -49,12 +51,6 @@ const enum LayoutType {
 
 const LayoutTypes: typeof LayoutType = findByPropsLazy("SECTION", "SIDEBAR_ITEM", "PANEL");
 
-const enum SectionType {
-    HEADER = "HEADER",
-    DIVIDER = "DIVIDER",
-    CUSTOM = "CUSTOM"
-}
-
 type SettingsLocation =
     | "top"
     | "aboveNitro"
@@ -64,7 +60,7 @@ type SettingsLocation =
     | "bottom";
 
 interface SettingsLayoutNode {
-    type: LayoutType | SectionType;
+    type: LayoutType;
     key?: string;
     legacySearchKey?: string;
     getLegacySearchKey?(): string;
@@ -90,6 +86,8 @@ interface SettingsLayoutBuilder {
 }
 
 const SECTION_KEY_PREFIX = "equicord_section";
+const FIRST_CUSTOM_ENTRY_CLASS = "vc-kamidere-settings-custom-entry-first";
+const CUSTOM_ENTRY_CLASS = "vc-kamidere-settings-custom-entry";
 
 const settings = definePluginSettings({
     settingsLocation: {
@@ -202,19 +200,13 @@ export default definePlugin({
 
     invalidateSectionLayout() {
         this.layoutVersion++;
-    },
-
-    buildDivider(key: string): SettingsLayoutNode {
-        return {
-            key,
-            type: SectionType.DIVIDER
-        };
+        this.scheduleCustomEntrySidebarSync();
     },
 
     getSectionEntries() {
-        const { buildEntry, buildDivider } = this;
+        const { buildEntry } = this;
 
-        const coreEntries = [
+        return [
             buildEntry({
                 key: "equicord_main",
                 title: BRAND_NAME,
@@ -265,17 +257,9 @@ export default definePlugin({
                 title: "Patch Helper",
                 Component: PatchHelperTab,
                 Icon: PatchHelperIcon
-            })
+            }),
+            ...this.customEntries.map(buildEntry)
         ].filter(isTruthy);
-
-        const pluginEntries = this.customEntries.map(buildEntry).filter(isTruthy);
-
-        return [
-            ...coreEntries,
-            ...(pluginEntries.length
-                ? [buildDivider("equicord_custom_plugins_divider"), ...pluginEntries]
-                : [])
-        ];
     },
 
     buildLayout(originalLayoutBuilder: SettingsLayoutBuilder) {
@@ -324,6 +308,88 @@ export default definePlugin({
 
     customSections: [] as ((SectionTypes: Record<string, string>) => { section: string; element: ComponentType; label: string; id?: string; })[],
     customEntries: [] as EntryOptions[],
+    sidebarSyncFrame: 0 as number,
+    sidebarObserver: null as MutationObserver | null,
+
+    scheduleCustomEntrySidebarSync() {
+        if (this.sidebarSyncFrame) cancelAnimationFrame(this.sidebarSyncFrame);
+        this.sidebarSyncFrame = requestAnimationFrame(() => {
+            this.sidebarSyncFrame = 0;
+            this.syncCustomEntrySidebarDecorations();
+        });
+    },
+
+    findSidebarItemElement(entry: EntryOptions) {
+        const route = `${entry.key}_panel`;
+
+        const directMatch = document.querySelector<HTMLElement>(
+            [
+                `[aria-controls="${route}"]`,
+                `[data-item-id="${route}"]`,
+                `[data-list-item-id="${route}"]`,
+                `[aria-controls="${entry.key}"]`,
+                `[data-item-id="${entry.key}"]`,
+                `[data-list-item-id="${entry.key}"]`,
+            ].join(", "),
+        );
+        if (directMatch) return directMatch;
+
+        const normalizedTitle = entry.title.trim().toLowerCase();
+        const candidates = document.querySelectorAll<HTMLElement>("[role='tab'], button, [aria-controls], [data-item-id], [data-list-item-id]");
+
+        for (const candidate of candidates) {
+            if (candidate.textContent?.trim().toLowerCase() !== normalizedTitle) continue;
+            return candidate;
+        }
+
+        return null;
+    },
+
+    syncCustomEntrySidebarDecorations() {
+        document.querySelectorAll(`.${CUSTOM_ENTRY_CLASS}, .${FIRST_CUSTOM_ENTRY_CLASS}`).forEach(el => {
+            el.classList.remove(CUSTOM_ENTRY_CLASS, FIRST_CUSTOM_ENTRY_CLASS);
+        });
+
+        if (!this.customEntries.length) return;
+
+        const foundElements = this.customEntries
+            .map(entry => ({ entry, element: this.findSidebarItemElement(entry) }))
+            .filter((value): value is { entry: EntryOptions; element: HTMLElement; } => value.element !== null);
+
+        if (!foundElements.length) return;
+
+        foundElements.forEach(({ element }) => element.classList.add(CUSTOM_ENTRY_CLASS));
+        foundElements[0].element.classList.add(FIRST_CUSTOM_ENTRY_CLASS);
+    },
+
+    start() {
+        if (!document.body) return;
+
+        this.scheduleCustomEntrySidebarSync();
+
+        this.sidebarObserver?.disconnect();
+        this.sidebarObserver = new MutationObserver(() => this.scheduleCustomEntrySidebarSync());
+        this.sidebarObserver.observe(document.body, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ["aria-controls", "data-item-id", "data-list-item-id", "class"]
+        });
+    },
+
+    stop() {
+        this.sidebarObserver?.disconnect();
+        this.sidebarObserver = null;
+
+        if (this.sidebarSyncFrame) {
+            cancelAnimationFrame(this.sidebarSyncFrame);
+            this.sidebarSyncFrame = 0;
+        }
+
+        document.querySelectorAll(`.${CUSTOM_ENTRY_CLASS}, .${FIRST_CUSTOM_ENTRY_CLASS}`).forEach(el => {
+            el.classList.remove(CUSTOM_ENTRY_CLASS, FIRST_CUSTOM_ENTRY_CLASS);
+        });
+    },
 
     get electronVersion() {
         return VencordNative.native.getVersions().electron ?? window.legcord?.electron ?? null;
