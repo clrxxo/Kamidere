@@ -153,6 +153,40 @@ export function collectMediaItems({ content, attachments = [], embeds = [] }: Me
     return dedupeMedia(items);
 }
 
+export function collectMessageMediaItems(message: Partial<Message>) {
+    const items = collectMediaItems({
+        content: message.content,
+        attachments: message.attachments ?? [],
+        embeds: message.embeds ?? [],
+    });
+
+    for (const snapshot of message.messageSnapshots ?? []) {
+        items.push(...collectMediaItems({
+            content: snapshot.message?.content,
+            attachments: snapshot.message?.attachments ?? [],
+            embeds: snapshot.message?.embeds ?? [],
+        }));
+    }
+
+    return dedupeMedia(items);
+}
+
+export function getMessageDisplayContent(message: Partial<Message>, fallbackContent = "") {
+    const directContent = normalizeContent(message.content);
+    if (directContent) return message.content ?? "";
+
+    for (const snapshot of message.messageSnapshots ?? []) {
+        const snapshotContent = normalizeContent(snapshot.message?.content);
+        if (snapshotContent) return snapshot.message?.content ?? "";
+    }
+
+    return fallbackContent;
+}
+
+export function isForwardedMessage(message: Partial<Message>) {
+    return (message.messageSnapshots?.length ?? 0) > 0;
+}
+
 export function getMessageTimestamp(message: Pick<Message, "timestamp">) {
     const value = new Date(message.timestamp as unknown as string | number | Date).getTime();
     return Number.isFinite(value) ? value : Date.now();

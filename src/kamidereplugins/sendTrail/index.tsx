@@ -11,7 +11,7 @@ import SendTrailTab from "./SendTrailTab";
 import { settings } from "./settings";
 import { appendSentTrailRecord, mergeSentTrailRecordMedia, removeSentTrailRecord } from "./store";
 import type { MessageCreatePayload, MessageDeletePayload, MessageUpdatePayload, PendingSendDraft, SentTrailRecord } from "./types";
-import { buildJumpLink, collectMediaItems, getChannelRecipientIds, getMessageTimestamp, getRecordPreview, hasMediaLinks, makeAttachmentSignature, makeUploadSignature, normalizeContent } from "./utils";
+import { buildJumpLink, collectMessageMediaItems, getChannelRecipientIds, getMessageDisplayContent, getMessageTimestamp, getRecordPreview, hasMediaLinks, isForwardedMessage, makeAttachmentSignature, makeUploadSignature, normalizeContent } from "./utils";
 
 const DRAFT_TTL_MS = 20_000;
 const MIN_MATCH_SCORE = 4;
@@ -56,13 +56,9 @@ function getDraftScore(draft: PendingSendDraft, payload: MessageCreatePayload) {
     const now = Date.now();
     if (now - draft.createdAt > DRAFT_TTL_MS) return Number.NEGATIVE_INFINITY;
 
-    const normalizedContent = normalizeContent(message.content);
+    const normalizedContent = normalizeContent(getMessageDisplayContent(message, message.content ?? ""));
     const attachmentSignature = makeAttachmentSignature(message.attachments ?? []);
-    const media = collectMediaItems({
-        content: message.content,
-        attachments: message.attachments ?? [],
-        embeds: message.embeds ?? [],
-    });
+    const media = collectMessageMediaItems(message);
 
     let score = 2;
 
@@ -116,18 +112,14 @@ function resolveBestDraft(payload: MessageCreatePayload) {
     return bestDraft;
 }
 
-function buildRecord(payload: MessageCreatePayload, draft: PendingSendDraft): SentTrailRecord {
+function buildRecord(payload: MessageCreatePayload, draft?: PendingSendDraft | null): SentTrailRecord {
     const { message } = payload;
     const channel = ChannelStore.getChannel(message.channel_id);
     const guildId = payload.guildId ?? channel?.guild_id ?? "@me";
     const guild = guildId !== "@me" ? GuildStore.getGuild(guildId) : null;
     const timestamp = getMessageTimestamp(message);
-    const content = message.content ?? draft.content ?? "";
-    const media = collectMediaItems({
-        content,
-        attachments: message.attachments ?? [],
-        embeds: message.embeds ?? [],
-    });
+    const content = getMessageDisplayContent(message, draft?.content ?? "");
+    const media = collectMessageMediaItems(message);
     const normalizedContent = normalizeContent(content);
 
     return {
@@ -145,7 +137,7 @@ function buildRecord(payload: MessageCreatePayload, draft: PendingSendDraft): Se
         channelNameSnapshot: channel?.name ?? undefined,
         guildNameSnapshot: guild?.name ?? undefined,
         recipientUserIds: getChannelRecipientIds(channel),
-        replyMessageId: message.messageReference?.message_id ?? draft.replyMessageId,
+        replyMessageId: message.messageReference?.message_id ?? draft?.replyMessageId,
     };
 }
 
@@ -157,11 +149,7 @@ async function maybeEnrichRecord(payload: MessageUpdatePayload) {
     const message = cachedMessage ?? payload.message;
     if (!message?.author || message.author.id !== currentUserId) return;
 
-    const media = collectMediaItems({
-        content: message.content,
-        attachments: message.attachments ?? [],
-        embeds: message.embeds ?? [],
-    });
+    const media = collectMessageMediaItems(message);
     if (!media.length) return;
 
     const channel = ChannelStore.getChannel(message.channel_id);
@@ -186,11 +174,7 @@ async function enrichFromStore(channelId: string, messageId: string, guildId?: s
     const message = MessageStore.getMessage(channelId, messageId);
     if (!message) return false;
 
-    const media = collectMediaItems({
-        content: message.content,
-        attachments: message.attachments ?? [],
-        embeds: message.embeds ?? [],
-    });
+    const media = collectMessageMediaItems(message);
     if (!media.length) return false;
 
     const channel = ChannelStore.getChannel(channelId);
@@ -286,7 +270,7 @@ export default definePlugin({
             if (!currentUserId || payload.message.author?.id !== currentUserId) return;
 
             const draft = resolveBestDraft(payload);
-            if (!draft) return;
+            if (!draft && !isForwardedMessage(payload.message)) return;
 
             const record = buildRecord(payload, draft);
             await appendSentTrailRecord(record);
