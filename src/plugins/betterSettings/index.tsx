@@ -196,7 +196,7 @@ export default definePlugin({
                         {children}
                     </Menu.MenuItem>
                 );
-            } else if (key.endsWith("_section") && props.label) {
+            } else if (typeof key === "string" && key.endsWith("_section") && props.label) {
                 items.push(
                     <Menu.MenuItem key={key} label={props.label} id={props.label}>
                         {this.transformSettingsElements(props.children)}

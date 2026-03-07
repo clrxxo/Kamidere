@@ -66,15 +66,25 @@ function getBuildLabel() {
     return "Desktop";
 }
 
+function isCountablePlugin(plugin: unknown): plugin is { hidden?: boolean; name: string; } {
+    return typeof plugin === "object"
+        && plugin !== null
+        && typeof (plugin as { name?: unknown; }).name === "string";
+}
+
 function KamidereSettings() {
     const settings = useSettings();
     const needsVibrancySettings = IS_DISCORD_DESKTOP && IS_MAC;
 
     const totalPlugins = React.useMemo(
-        () => Object.values(plugins).filter(plugin => !plugin.hidden && !plugin.name.endsWith("API")).length,
+        () => Object.values(plugins).filter(plugin =>
+            isCountablePlugin(plugin)
+            && !plugin.hidden
+            && !plugin.name.endsWith("API"),
+        ).length,
         [],
     );
-    const enabledPlugins = Object.values(settings.plugins).filter(plugin => plugin.enabled).length;
+    const enabledPlugins = Object.values(settings.plugins).filter(plugin => plugin?.enabled).length;
 
     const Switches: Array<false | {
         key: KeysOfType<typeof settings, boolean>;
