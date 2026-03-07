@@ -6,15 +6,14 @@
 
 import { showNotice } from "@api/Notices";
 import { isPluginEnabled, pluginRequiresRestart, startDependenciesRecursive, startPlugin, stopPlugin } from "@api/PluginManager";
+import { Button } from "@components/Button";
 import { CogWheel, InfoIcon } from "@components/Icons";
 import { AddonCard } from "@components/settings/AddonCard";
-import SettingsPlugin from "@plugins/_core/settings";
 import { classNameFactory } from "@utils/css";
 import { Logger } from "@utils/Logger";
-import { closeAllModals } from "@utils/modal";
-import { removeFromArray } from "@utils/misc";
+import { relaunch } from "@utils/native";
 import { OptionType, Plugin } from "@utils/types";
-import { FluxDispatcher, React, SettingsRouter, showToast, Toasts } from "@webpack/common";
+import { React, showToast, Toasts } from "@webpack/common";
 import { Settings } from "Vencord";
 
 import { PluginMeta } from "~plugins";
@@ -24,8 +23,6 @@ import { getPluginSourceInfo } from "./pluginSource";
 
 const logger = new Logger("PluginCard");
 const cl = classNameFactory("vc-plugins-");
-const SETTINGS_SIDEBAR_VISIBILITY_RETRY_DELAYS_MS = [0, 80, 180, 320, 520];
-const SETTINGS_SIDEBAR_VISIBILITY_OBSERVER_LIFETIME_MS = 1500;
 
 interface PluginCardProps extends React.HTMLProps<HTMLDivElement> {
     plugin: Plugin;
@@ -36,156 +33,14 @@ interface PluginCardProps extends React.HTMLProps<HTMLDivElement> {
     onMouseLeave?: React.MouseEventHandler<HTMLDivElement>;
 }
 
-const SETTINGS_TAB_STATUS_HIDE_DELAY_MS = 2200;
-const SETTINGS_TAB_STATUS_TRANSITION_MS = 280;
-const SETTINGS_MODAL_REOPEN_DELAY_MS = 110;
-
-function wait(ms: number) {
-    return new Promise<void>(resolve => window.setTimeout(resolve, ms));
-}
-
-function getSettingsTabEntryKey(plugin: Plugin) {
-    return plugin.settingsTab?.route.replace(/_panel$/, "") ?? null;
-}
-
-function syncRegisteredSettingsTab(plugin: Plugin, enabled: boolean) {
-    const entryKey = getSettingsTabEntryKey(plugin);
-    if (!entryKey) return;
-
-    if (!enabled) {
-        while (SettingsPlugin.customEntries.some(entry => entry.key === entryKey)) {
-            removeFromArray(SettingsPlugin.customEntries, entry => entry.key === entryKey);
-        }
-
-        while (SettingsPlugin.settingsSectionMap.some(entry => entry[1] === entryKey || entry[1] === plugin.settingsTab?.route)) {
-            removeFromArray(SettingsPlugin.settingsSectionMap, entry => entry[1] === entryKey || entry[1] === plugin.settingsTab?.route);
-        }
-    }
-
-    SettingsPlugin.invalidateSectionLayout();
-}
-
-function findLiveSettingsTabNodes(title: string) {
-    const modalRoot = document.querySelector<HTMLElement>("[aria-modal='true']");
-    if (!modalRoot) return [];
-
-    const matches = new Set<HTMLElement>();
-    const candidates = modalRoot.querySelectorAll<HTMLElement>("button, a, [role='button'], [role='tab'], div, span");
-
-    for (const candidate of candidates) {
-        const text = candidate.textContent?.replace(/\s+/g, " ").trim();
-        if (!text || !text.includes(title)) continue;
-
-        const interactive = candidate.closest<HTMLElement>("button, a, [role='button'], [role='tab']");
-        if (!interactive) continue;
-
-        const sidebarContainer = interactive.closest("nav, aside, [class*='sidebar'], [class*='standardSidebarView'], [class*='side']");
-        if (!sidebarContainer) continue;
-
-        matches.add(interactive);
-    }
-
-    return [...matches];
-}
-
-function applyLiveSettingsTabVisibility(plugin: Plugin, enabled: boolean) {
-    const title = plugin.settingsTab?.title?.trim();
-    if (!title) return;
-
-    for (const node of findLiveSettingsTabNodes(title)) {
-        if (enabled) {
-            if (node.dataset.kamidereSettingsTabHidden === "true") {
-                node.style.removeProperty("display");
-                node.style.removeProperty("visibility");
-                node.style.removeProperty("pointer-events");
-                delete node.dataset.kamidereSettingsTabHidden;
-            }
-        } else {
-            node.style.display = "none";
-            node.style.visibility = "hidden";
-            node.style.pointerEvents = "none";
-            node.dataset.kamidereSettingsTabHidden = "true";
-        }
-    }
-}
-
-function syncLiveSettingsTabVisibility(plugin: Plugin, enabled: boolean) {
-    for (const delay of SETTINGS_SIDEBAR_VISIBILITY_RETRY_DELAYS_MS) {
-        window.setTimeout(() => applyLiveSettingsTabVisibility(plugin, enabled), delay);
-    }
-
-    const modalRoot = document.querySelector<HTMLElement>("[aria-modal='true']");
-    if (!modalRoot) return;
-
-    const observer = new MutationObserver(() => applyLiveSettingsTabVisibility(plugin, enabled));
-    observer.observe(modalRoot, { childList: true, subtree: true, attributes: true });
-    window.setTimeout(() => observer.disconnect(), SETTINGS_SIDEBAR_VISIBILITY_OBSERVER_LIFETIME_MS);
-}
-
 export function PluginCard({ plugin, disabled, onRestartNeeded, onMouseEnter, onMouseLeave, isNew }: PluginCardProps) {
     const settings = Settings.plugins[plugin.name];
     const pluginMeta = PluginMeta[plugin.name];
     const isUserPlugin = pluginMeta?.userPlugin ?? false;
     const sourceInfo = getPluginSourceInfo(pluginMeta?.folderName, isUserPlugin, plugin.isModified ?? false);
-    const [renderedSettingsTabStatus, setRenderedSettingsTabStatus] = React.useState<null | { enabled: boolean; }>(null);
-    const [isSettingsTabStatusVisible, setIsSettingsTabStatusVisible] = React.useState(false);
-    const settingsTabStatusHideTimerRef = React.useRef<number | null>(null);
-    const settingsTabStatusUnmountTimerRef = React.useRef<number | null>(null);
+    const [settingsTabRestartNotice, setSettingsTabRestartNotice] = React.useState<null | { enabled: boolean; }>(null);
 
     const isEnabled = () => isPluginEnabled(plugin.name);
-
-    React.useEffect(() => () => {
-        if (settingsTabStatusHideTimerRef.current !== null) {
-            window.clearTimeout(settingsTabStatusHideTimerRef.current);
-        }
-
-        if (settingsTabStatusUnmountTimerRef.current !== null) {
-            window.clearTimeout(settingsTabStatusUnmountTimerRef.current);
-        }
-    }, []);
-
-    async function refreshPluginSettingsView() {
-        if (!plugin.settingsTab) return;
-
-        try {
-            FluxDispatcher.dispatch({ type: "USER_SETTINGS_MODAL_CLOSE" });
-            closeAllModals();
-            await wait(SETTINGS_MODAL_REOPEN_DELAY_MS);
-            await SettingsRouter.openUserSettings("my_account_panel");
-            await wait(SETTINGS_MODAL_REOPEN_DELAY_MS);
-            await SettingsRouter.openUserSettings("equicord_plugins_panel");
-        } catch {
-            void SettingsRouter.openUserSettings("my_account_panel");
-            window.setTimeout(() => {
-                void SettingsRouter.openUserSettings("equicord_plugins_panel");
-            }, SETTINGS_MODAL_REOPEN_DELAY_MS);
-        }
-    }
-
-    function showSettingsTabStatus(enabled: boolean) {
-        if (!plugin.settingsTab) return;
-
-        if (settingsTabStatusHideTimerRef.current !== null) {
-            window.clearTimeout(settingsTabStatusHideTimerRef.current);
-            settingsTabStatusHideTimerRef.current = null;
-        }
-
-        if (settingsTabStatusUnmountTimerRef.current !== null) {
-            window.clearTimeout(settingsTabStatusUnmountTimerRef.current);
-            settingsTabStatusUnmountTimerRef.current = null;
-        }
-
-        setRenderedSettingsTabStatus({ enabled });
-        window.requestAnimationFrame(() => setIsSettingsTabStatusVisible(true));
-
-        settingsTabStatusHideTimerRef.current = window.setTimeout(() => {
-            setIsSettingsTabStatusVisible(false);
-            settingsTabStatusUnmountTimerRef.current = window.setTimeout(() => {
-                setRenderedSettingsTabStatus(null);
-                settingsTabStatusUnmountTimerRef.current = null;
-            }, SETTINGS_TAB_STATUS_TRANSITION_MS);
-        }, SETTINGS_TAB_STATUS_HIDE_DELAY_MS);
-    }
 
     function toggleEnabled() {
         const wasEnabled = isEnabled();
@@ -221,10 +76,7 @@ export function PluginCard({ plugin, disabled, onRestartNeeded, onMouseEnter, on
             settings.enabled = nextEnabled;
 
             if (plugin.settingsTab) {
-                syncRegisteredSettingsTab(plugin, nextEnabled);
-                syncLiveSettingsTabVisibility(plugin, nextEnabled);
-                void refreshPluginSettingsView();
-                showSettingsTabStatus(nextEnabled);
+                setSettingsTabRestartNotice({ enabled: nextEnabled });
             }
             return;
         }
@@ -245,10 +97,7 @@ export function PluginCard({ plugin, disabled, onRestartNeeded, onMouseEnter, on
         settings.enabled = nextEnabled;
 
         if (plugin.settingsTab) {
-            syncRegisteredSettingsTab(plugin, nextEnabled);
-            syncLiveSettingsTabVisibility(plugin, nextEnabled);
-            void refreshPluginSettingsView();
-            showSettingsTabStatus(nextEnabled);
+            setSettingsTabRestartNotice({ enabled: nextEnabled });
         }
     }
 
@@ -272,26 +121,21 @@ export function PluginCard({ plugin, disabled, onRestartNeeded, onMouseEnter, on
             disabled={disabled}
             onMouseEnter={onMouseEnter}
             onMouseLeave={onMouseLeave}
-            footer={renderedSettingsTabStatus && (
-                <div
-                    className={cl(
-                        "settings-tab-status-region",
-                        isSettingsTabStatusVisible ? "settings-tab-status-region-visible" : "settings-tab-status-region-hidden",
-                    )}
-                >
-                    <div
-                        className={cl(
-                            "settings-tab-status",
-                            renderedSettingsTabStatus.enabled ? "settings-tab-status-enabled" : "settings-tab-status-disabled",
-                        )}
-                    >
-                        <span className={cl("settings-tab-status-dot")} />
-                        <span className={cl("settings-tab-status-copy")}>
-                            {renderedSettingsTabStatus.enabled
-                                ? `${plugin.settingsTab?.title} tab added to Kamidere Settings.`
-                                : `${plugin.settingsTab?.title} tab removed from Kamidere Settings.`}
-                        </span>
+            footer={settingsTabRestartNotice && (
+                <div className={cl("settings-tab-restart-notice")}>
+                    <div className={cl("settings-tab-restart-copy")}>
+                        {settingsTabRestartNotice.enabled
+                            ? `Restart Discord to show the ${plugin.settingsTab?.title} page in Kamidere Settings.`
+                            : `Restart Discord to hide the ${plugin.settingsTab?.title} page from Kamidere Settings.`}
                     </div>
+                    <Button
+                        variant="secondary"
+                        size="small"
+                        className={cl("settings-tab-restart-action")}
+                        onClick={relaunch}
+                    >
+                        Restart Discord
+                    </Button>
                 </div>
             )}
             infoButton={

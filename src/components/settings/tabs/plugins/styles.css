@@ -289,65 +289,25 @@
     margin-top: 16px;
 }
 
-.vc-plugins-settings-tab-status-region {
-    overflow: hidden;
-    max-height: 0;
-    opacity: 0;
-    transform: translateY(-6px);
-    transition: max-height .28s ease, opacity .2s ease, transform .28s ease, margin-top .28s ease;
-    margin-top: 0;
-}
-
-.vc-plugins-settings-tab-status-region-visible {
-    max-height: 64px;
-    opacity: 1;
-    transform: translateY(0);
+.vc-plugins-settings-tab-restart-notice {
     margin-top: 10px;
-}
-
-.vc-plugins-settings-tab-status-region-hidden {
-    max-height: 0;
-    opacity: 0;
-    transform: translateY(-6px);
-    margin-top: 0;
-}
-
-.vc-plugins-settings-tab-status {
     display: flex;
     align-items: center;
-    gap: 8px;
+    justify-content: space-between;
+    gap: 12px;
     border-radius: 8px;
-    border: 1px solid var(--border-subtle);
-    background: color-mix(in srgb, var(--background-base-low) 92%, var(--background-surface-high) 8%);
-    padding: 10px 12px;
-    color: var(--text-default);
-}
-
-.vc-plugins-settings-tab-status-enabled {
-    border-color: color-mix(in srgb, var(--status-positive) 36%, var(--border-subtle));
-    background: color-mix(in srgb, var(--status-positive) 9%, var(--background-base-low));
-}
-
-.vc-plugins-settings-tab-status-disabled {
-    border-color: color-mix(in srgb, var(--status-warning) 36%, var(--border-subtle));
+    border: 1px solid color-mix(in srgb, var(--status-warning) 32%, var(--border-subtle));
     background: color-mix(in srgb, var(--status-warning) 8%, var(--background-base-low));
+    padding: 10px 12px;
 }
 
-.vc-plugins-settings-tab-status-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 999px;
-    flex: 0 0 auto;
-    background: var(--status-positive);
-    box-shadow: 0 0 0 4px color-mix(in srgb, currentColor 12%, transparent);
-}
-
-.vc-plugins-settings-tab-status-disabled .vc-plugins-settings-tab-status-dot {
-    background: var(--status-warning);
-}
-
-.vc-plugins-settings-tab-status-copy {
+.vc-plugins-settings-tab-restart-copy {
     font-size: 12px;
     line-height: 1.4;
     color: var(--text-default);
+}
+
+.vc-plugins-settings-tab-restart-action {
+    flex: 0 0 auto;
+    white-space: nowrap;
 }
