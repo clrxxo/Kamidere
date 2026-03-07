@@ -26,7 +26,7 @@ const cl = classNameFactory("vc-send-trail-");
 const LIVE_DELETE_DELAY_MS = 850;
 const PURGE_STATUS_HIDE_DELAY_MS = 2400;
 const PURGE_STATUS_TRANSITION_MS = 280;
-const DEFAULT_PAGE_SIZE: PageSizeValue = "10";
+const DEFAULT_PAGE_SIZE: PageSizeValue = "5";
 
 const HERO_BACKGROUND = `data:image/svg+xml;utf8,${encodeURIComponent(
     [
@@ -51,7 +51,7 @@ const HERO_BACKGROUND = `data:image/svg+xml;utf8,${encodeURIComponent(
 type ScopeValue = "all" | "dms" | `guild:${string}`;
 type KindValue = "all" | "text" | "media";
 type PeriodValue = "all" | "24h" | "7d";
-type PageSizeValue = "10" | "20" | "30" | "50";
+type PageSizeValue = "5" | "10" | "20" | "30" | "50";
 type PurgeStatusPhase = "idle" | "running" | "success" | "partial" | "failure";
 
 interface SelectOption<T extends string> {
@@ -491,6 +491,8 @@ function SendTrailTab() {
     const purgeStatusTimerRef = React.useRef<number | null>(null);
     const purgeStatusExitTimerRef = React.useRef<number | null>(null);
     const purgeStatusFrameRef = React.useRef<number | null>(null);
+    const historyFooterRef = React.useRef<HTMLDivElement | null>(null);
+    const keepFooterVisibleRef = React.useRef(false);
 
     React.useEffect(() => {
         return () => {
@@ -610,6 +612,7 @@ function SendTrailTab() {
     ];
 
     const pageSizeOptions: SelectOption<PageSizeValue>[] = [
+        { label: "5", value: "5" },
         { label: "10", value: "10" },
         { label: "20", value: "20" },
         { label: "30", value: "30" },
@@ -646,6 +649,21 @@ function SendTrailTab() {
         if (currentPage <= totalPages) return;
         setCurrentPage(totalPages);
     }, [currentPage, totalPages]);
+
+    React.useEffect(() => {
+        if (!keepFooterVisibleRef.current) return;
+
+        keepFooterVisibleRef.current = false;
+        const footer = historyFooterRef.current;
+        if (!footer) return;
+
+        window.requestAnimationFrame(() => {
+            footer.scrollIntoView({
+                behavior: "smooth",
+                block: "end",
+            });
+        });
+    }, [currentPage, pageSize]);
 
     const pagedRecords = React.useMemo(
         () => filteredRecords.slice(pageStartIndex, pageStartIndex + pageSizeNumber),
@@ -705,6 +723,16 @@ function SendTrailTab() {
     }, [pagedRecords]);
 
     const clearSelection = React.useCallback(() => setSelectedIds(new Set()), []);
+
+    const changePage = React.useCallback((nextPage: number) => {
+        keepFooterVisibleRef.current = true;
+        setCurrentPage(Math.max(1, Math.min(totalPages, nextPage)));
+    }, [totalPages]);
+
+    const changePageSize = React.useCallback((nextPageSize: PageSizeValue) => {
+        keepFooterVisibleRef.current = true;
+        setPageSize(nextPageSize);
+    }, []);
 
     const toggleRecordSelection = React.useCallback((recordId: string) => {
         setSelectedIds(current => {
@@ -1084,7 +1112,7 @@ function SendTrailTab() {
                     ))}
                 </div>
 
-                <div className={cl("history-footer")}>
+                <div ref={historyFooterRef} className={cl("history-footer")}>
                     <div className={cl("history-footer-main")}>
                         <span className={cl("pagination-summary")}>
                             Showing {pageRangeStart}-{pageRangeEnd} from {filteredRecords.length}
@@ -1096,13 +1124,13 @@ function SendTrailTab() {
                                 double
                                 disabled={currentPage <= 1 || filteredRecords.length === 0 || isBusy}
                                 label="First page"
-                                onClick={() => setCurrentPage(1)}
+                                onClick={() => changePage(1)}
                             />
                             <PaginationNavButton
                                 direction="left"
                                 disabled={currentPage <= 1 || filteredRecords.length === 0 || isBusy}
                                 label="Previous page"
-                                onClick={() => setCurrentPage(page => Math.max(1, page - 1))}
+                                onClick={() => changePage(currentPage - 1)}
                             />
 
                             <span className={cl("pagination-page-chip")}>{currentPage}</span>
@@ -1112,28 +1140,33 @@ function SendTrailTab() {
                                 direction="right"
                                 disabled={currentPage >= totalPages || filteredRecords.length === 0 || isBusy}
                                 label="Next page"
-                                onClick={() => setCurrentPage(page => Math.min(totalPages, page + 1))}
+                                onClick={() => changePage(currentPage + 1)}
                             />
                             <PaginationNavButton
                                 direction="right"
                                 double
                                 disabled={currentPage >= totalPages || filteredRecords.length === 0 || isBusy}
                                 label="Last page"
-                                onClick={() => setCurrentPage(totalPages)}
+                                onClick={() => changePage(totalPages)}
                             />
                         </div>
 
                         <div className={cl("pagination-page-size")}>
                             <span className={cl("pagination-page-size-label")}>Rows per page:</span>
-                            <div className={cl("pagination-page-size-select")}>
-                                <Select
-                                    options={pageSizeOptions}
-                                    select={(value: PageSizeValue) => setPageSize(value)}
-                                    isSelected={(value: PageSizeValue) => pageSize === value}
-                                    serialize={(value: PageSizeValue) => value}
-                                    isDisabled={isBusy || filteredRecords.length === 0}
-                                />
-                            </div>
+                            <label className={cl("pagination-page-size-select")}>
+                                <select
+                                    className={cl("pagination-page-size-native")}
+                                    value={pageSize}
+                                    disabled={isBusy || filteredRecords.length === 0}
+                                    onChange={event => changePageSize(event.currentTarget.value as PageSizeValue)}
+                                >
+                                    {pageSizeOptions.map(option => (
+                                        <option key={option.value} value={option.value}>
+                                            {option.label}
+                                        </option>
+                                    ))}
+                                </select>
+                            </label>
                         </div>
                     </div>
 
