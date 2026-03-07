@@ -179,6 +179,21 @@ export function resolveRecordContext(record: SentTrailRecord) {
     };
 }
 
+export function getChannelRecipientIds(channel: Channel | undefined) {
+    const recipientIds = new Set<string>();
+
+    for (const id of channel?.recipients ?? []) {
+        if (typeof id === "string" && id.length) recipientIds.add(id);
+    }
+
+    const rawRecipients = (channel as Channel & { rawRecipients?: Array<{ id?: string; }>; } | undefined)?.rawRecipients;
+    for (const recipient of rawRecipients ?? []) {
+        if (typeof recipient?.id === "string" && recipient.id.length) recipientIds.add(recipient.id);
+    }
+
+    return Array.from(recipientIds);
+}
+
 function getChannelDisplayName(channel: Channel | undefined) {
     if (!channel) return null;
 

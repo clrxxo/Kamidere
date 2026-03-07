@@ -1,27 +1,30 @@
 import "./styles.css";
 
-import { Button } from "@components/Button";
+import { BaseText } from "@components/BaseText";
+import { Button, TextButton } from "@components/Button";
 import { Card } from "@components/Card";
-import { Divider } from "@components/Divider";
 import { Heading, HeadingTertiary } from "@components/Heading";
-import { DeleteIcon, LinkIcon, LogIcon } from "@components/Icons";
+import { CogWheel, DeleteIcon, LogIcon } from "@components/Icons";
 import { Notice } from "@components/Notice";
 import { Paragraph } from "@components/Paragraph";
-import { QuickAction, QuickActionCard } from "@components/settings/QuickAction";
 import { SettingsTab, wrapTab } from "@components/settings";
 import { SpecialCard } from "@components/settings/SpecialCard";
+import { Switch } from "@components/Switch";
 import { BRAND_ICON_DATA_URL, BRAND_NAME } from "@shared/branding";
 import { classNameFactory } from "@utils/css";
 import { Margins } from "@utils/margins";
+import { closeModal, ModalCloseButton, ModalContent, ModalFooter, ModalHeader, ModalProps, ModalRoot, ModalSize, openModal } from "@utils/modal";
 import { sleep } from "@utils/misc";
-import { Alerts, MessageActions, NavigationRouter, React, Select, TextInput, Toasts, UserStore, useStateFromStores } from "@webpack/common";
+import { Alerts, ChannelStore, MessageActions, NavigationRouter, React, Select, TextInput, Toasts, UserStore, useStateFromStores } from "@webpack/common";
 
-import { clearSentTrailRecords, removeSentTrailRecordsWhere, useSentTrailRecords } from "./store";
+import { clearSentTrailRecords, removeSentTrailRecord, useSentTrailRecords } from "./store";
+import { parseProtectedDmChannels, settings, SendTrailPurgeTarget } from "./settings";
 import type { SentTrailMediaItem, SentTrailRecord } from "./types";
-import { buildSearchIndex, formatDayLabel, formatTime, recordMatchesScope, resolveRecordContext } from "./utils";
+import { buildSearchIndex, formatDayLabel, formatTime, getChannelRecipientIds, recordMatchesScope, resolveRecordContext } from "./utils";
 
 const cl = classNameFactory("vc-send-trail-");
-const LIVE_DELETE_DELAY_MS = 350;
+const LIVE_DELETE_DELAY_MS = 850;
+const PURGE_STATUS_HIDE_DELAY_MS = 2400;
 
 const HERO_BACKGROUND = `data:image/svg+xml;utf8,${encodeURIComponent(
     [
@@ -46,6 +49,7 @@ const HERO_BACKGROUND = `data:image/svg+xml;utf8,${encodeURIComponent(
 type ScopeValue = "all" | "dms" | `guild:${string}`;
 type KindValue = "all" | "text" | "media";
 type PeriodValue = "all" | "24h" | "7d";
+type PurgeStatusPhase = "idle" | "running" | "success" | "partial" | "failure";
 
 interface SelectOption<T extends string> {
     label: string;
@@ -57,6 +61,23 @@ interface RecordGroup {
     records: SentTrailRecord[];
 }
 
+interface PurgeStatusState {
+    phase: PurgeStatusPhase;
+    total: number;
+    processed: number;
+    deleted: number;
+    failed: number;
+    skipped: number;
+    currentLabel?: string;
+}
+
+interface DmConversation {
+    channelId: string;
+    label: string;
+    details: string;
+    count: number;
+}
+
 function showToast(message: string, type: any) {
     Toasts.show({
         message,
@@ -66,6 +87,74 @@ function showToast(message: string, type: any) {
             position: Toasts.Position.BOTTOM,
         },
     });
+}
+
+function makeEmptyPurgeStatus(): PurgeStatusState {
+    return {
+        phase: "idle",
+        total: 0,
+        processed: 0,
+        deleted: 0,
+        failed: 0,
+        skipped: 0,
+    };
+}
+
+function isDirectMessageRecord(record: SentTrailRecord) {
+    return record.guildId === "@me";
+}
+
+function isRecordProtected(
+    record: SentTrailRecord,
+    purgeTarget: SendTrailPurgeTarget,
+    protectAllDms: boolean,
+    protectedDmChannels: Set<string>,
+) {
+    const isDm = isDirectMessageRecord(record);
+
+    if (purgeTarget === "dms" && !isDm) return true;
+    if (purgeTarget === "servers" && isDm) return true;
+    if (isDm && protectAllDms) return true;
+    if (isDm && protectedDmChannels.has(record.channelId)) return true;
+
+    return false;
+}
+
+function buildDmConversations(records: SentTrailRecord[]) {
+    const conversations = new Map<string, DmConversation>();
+
+    for (const record of records) {
+        if (!isDirectMessageRecord(record)) continue;
+
+        const context = resolveRecordContext(record);
+        const channel = ChannelStore.getChannel(record.channelId);
+        const recipientIds = getChannelRecipientIds(channel);
+        const recipientNames = recipientIds
+            .map(id => UserStore.getUser(id))
+            .filter(Boolean)
+            .map(user => user.globalName || user.username)
+            .filter(Boolean);
+
+        const label = recipientNames[0] ?? context.channelName;
+        const details = recipientNames.length > 1
+            ? recipientNames.join(", ")
+            : context.channelName;
+
+        const existing = conversations.get(record.channelId);
+        if (existing) {
+            existing.count++;
+            continue;
+        }
+
+        conversations.set(record.channelId, {
+            channelId: record.channelId,
+            label,
+            details,
+            count: 1,
+        });
+    }
+
+    return Array.from(conversations.values()).sort((left, right) => left.label.localeCompare(right.label));
 }
 
 function MediaPreview({ media }: { media: SentTrailMediaItem[]; }) {
@@ -106,14 +195,173 @@ function MediaPreview({ media }: { media: SentTrailMediaItem[]; }) {
     );
 }
 
+function PurgeStatusBanner({ status }: { status: PurgeStatusState; }) {
+    if (status.phase === "idle") return null;
+
+    const isRunning = status.phase === "running";
+    const isSuccess = status.phase === "success";
+    const isPartial = status.phase === "partial";
+    const progress = status.total > 0 ? Math.max(8, Math.round((status.processed / status.total) * 100)) : 0;
+
+    let title = "Preparing purge";
+    let subtitle = "Checking the current queue.";
+
+    if (isRunning) {
+        title = `Purging ${status.processed}/${status.total}`;
+        subtitle = status.currentLabel
+            ? `Deleting ${status.currentLabel} one message at a time.`
+            : "Deleting selected messages one by one to keep the pace safe.";
+    } else if (isSuccess) {
+        title = "Purge complete";
+        subtitle = `Deleted ${status.deleted} message${status.deleted === 1 ? "" : "s"}${status.skipped ? ` and skipped ${status.skipped} protected entr${status.skipped === 1 ? "y" : "ies"}` : ""}.`;
+    } else if (isPartial) {
+        title = "Purge finished with some skips";
+        subtitle = `Deleted ${status.deleted}, failed ${status.failed}${status.skipped ? `, skipped ${status.skipped} protected` : ""}.`;
+    } else {
+        title = "Purge could not finish";
+        subtitle = `Nothing was deleted${status.skipped ? ` and ${status.skipped} entr${status.skipped === 1 ? "y was" : "ies were"} protected by config` : ""}.`;
+    }
+
+    return (
+        <div className={cl("purge-status", status.phase)} aria-live="polite">
+            <div className={cl("purge-status-icon", isRunning ? "spinning" : status.phase)}>
+                {isRunning ? <span className={cl("spinner")} /> : <span className={cl("checkmark")}>OK</span>}
+            </div>
+
+            <div className={cl("purge-status-body")}>
+                <div className={cl("purge-status-title-row")}>
+                    <BaseText size="md" weight="semibold">{title}</BaseText>
+                    <span className={cl("meta-tag", "quiet")}>
+                        {status.deleted} deleted{status.failed ? ` · ${status.failed} failed` : ""}{status.skipped ? ` · ${status.skipped} skipped` : ""}
+                    </span>
+                </div>
+                <Paragraph className={cl("purge-status-text")}>{subtitle}</Paragraph>
+                <div className={cl("purge-progress-track")}>
+                    <div className={cl("purge-progress-fill")} style={{ width: `${isRunning ? progress : 100}%` }} />
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function SendTrailConfigModal({
+    modalProps,
+    close,
+    records,
+}: {
+    modalProps: ModalProps;
+    close(): void;
+    records: SentTrailRecord[];
+}) {
+    const config = settings.use(["purgeTarget", "protectAllDms", "protectedDmChannels"]);
+    const protectedDmChannels = React.useMemo(() => parseProtectedDmChannels(config.protectedDmChannels), [config.protectedDmChannels]);
+    const dmConversations = React.useMemo(() => buildDmConversations(records), [records]);
+
+    const purgeTargetOptions: SelectOption<SendTrailPurgeTarget>[] = [
+        { label: "Everything", value: "all" },
+        { label: "Direct Messages only", value: "dms" },
+        { label: "Servers only", value: "servers" },
+    ];
+
+    const updateProtectedDmChannels = React.useCallback((next: Set<string>) => {
+        settings.store.protectedDmChannels = Array.from(next).sort().join(",");
+    }, []);
+
+    const toggleProtectedDm = React.useCallback((channelId: string, enabled: boolean) => {
+        const next = new Set(protectedDmChannels);
+        if (enabled) next.add(channelId);
+        else next.delete(channelId);
+        updateProtectedDmChannels(next);
+    }, [protectedDmChannels, updateProtectedDmChannels]);
+
+    return (
+        <ModalRoot {...modalProps} size={ModalSize.MEDIUM}>
+            <ModalHeader separator={false}>
+                <BaseText size="lg" weight="semibold" style={{ flexGrow: 1 }}>Purge Config</BaseText>
+                <ModalCloseButton onClick={close} />
+            </ModalHeader>
+
+            <ModalContent className={cl("config-modal")}>
+                <Paragraph className={cl("config-copy")}>
+                    These rules decide what the `Purge Selected` action is allowed to delete. Protected direct messages stay in Send Trail until you change the config.
+                </Paragraph>
+
+                <div className={cl("config-grid")}>
+                    <div className={cl("config-field")}>
+                        <span className={cl("field-label")}>Purge Target</span>
+                        <Select
+                            options={purgeTargetOptions}
+                            select={(value: SendTrailPurgeTarget) => settings.store.purgeTarget = value}
+                            isSelected={(value: SendTrailPurgeTarget) => value === config.purgeTarget}
+                            serialize={(value: SendTrailPurgeTarget) => value}
+                        />
+                    </div>
+
+                    <div className={cl("config-switch-row")}>
+                        <div>
+                            <BaseText size="md" weight="semibold">Protect all DMs</BaseText>
+                            <Paragraph className={cl("config-hint")}>
+                                When enabled, no DM or group DM is ever purged, even if it is selected.
+                            </Paragraph>
+                        </div>
+                        <Switch checked={config.protectAllDms} onChange={value => settings.store.protectAllDms = value} />
+                    </div>
+                </div>
+
+                <div className={cl("config-list-header")}>
+                    <BaseText size="md" weight="semibold">Protected DM conversations</BaseText>
+                    {!!protectedDmChannels.size && (
+                        <TextButton variant="secondary" onClick={() => settings.store.protectedDmChannels = ""}>
+                            Clear protected DM list
+                        </TextButton>
+                    )}
+                </div>
+
+                {dmConversations.length === 0 ? (
+                    <Card className={cl("config-empty")} defaultPadding>
+                        <Paragraph className={Margins.reset}>
+                            No direct-message history has been captured yet. Once you send a DM from this client, it can be protected here.
+                        </Paragraph>
+                    </Card>
+                ) : (
+                    <div className={cl("config-list")}>
+                        {dmConversations.map(conversation => (
+                            <Card key={conversation.channelId} className={cl("config-item")} defaultPadding>
+                                <div className={cl("config-item-copy")}>
+                                    <BaseText size="md" weight="semibold">{conversation.label}</BaseText>
+                                    <Paragraph className={cl("config-hint")}>
+                                        {conversation.details} · {conversation.count} saved message{conversation.count === 1 ? "" : "s"}
+                                    </Paragraph>
+                                </div>
+                                <Switch
+                                    checked={protectedDmChannels.has(conversation.channelId)}
+                                    onChange={value => toggleProtectedDm(conversation.channelId, value)}
+                                />
+                            </Card>
+                        ))}
+                    </div>
+                )}
+            </ModalContent>
+
+            <ModalFooter>
+                <Button variant="secondary" onClick={close}>Close</Button>
+            </ModalFooter>
+        </ModalRoot>
+    );
+}
+
 function RecordCard({
     record,
+    selected,
     deleting,
-    onDelete,
+    protectedFromPurge,
+    onToggleSelected,
 }: {
     record: SentTrailRecord;
+    selected: boolean;
     deleting: boolean;
-    onDelete(): void;
+    protectedFromPurge: boolean;
+    onToggleSelected(): void;
 }) {
     const context = resolveRecordContext(record);
 
@@ -122,12 +370,15 @@ function RecordCard({
             <div className={cl("record-header")}>
                 <div className={cl("record-meta")}>
                     <div className={cl("record-context-row")}>
-                        <span className={cl("scope-pill", context.isDirectMessage ? "dm" : "guild")}>
+                        <span className={cl("scope-tag", context.isDirectMessage ? "dm" : "guild")}>
                             {context.isDirectMessage ? "Direct Messages" : context.guildName}
                         </span>
                         <span className={cl("channel-name")}>
                             {context.isDirectMessage ? context.channelName : `#${context.channelName}`}
                         </span>
+                        {protectedFromPurge && (
+                            <span className={cl("meta-tag", "protected")}>Protected</span>
+                        )}
                     </div>
 
                     <Paragraph className={cl("record-timestamp")}>
@@ -136,13 +387,18 @@ function RecordCard({
                 </div>
 
                 <div className={cl("record-actions")}>
-                    <span className={cl("time-pill")}>{formatTime(record.timestamp)}</span>
+                    <span className={cl("time-tag")}>{formatTime(record.timestamp)}</span>
                     <div className={cl("record-buttons")}>
-                        <Button size="small" variant="secondary" onClick={() => NavigationRouter.transitionTo(record.jumpLink)}>
-                            Open Message
+                        <Button size="xs" variant="secondary" onClick={() => NavigationRouter.transitionTo(record.jumpLink)}>
+                            Open
                         </Button>
-                        <Button size="small" variant="dangerSecondary" disabled={deleting} onClick={onDelete}>
-                            {deleting ? "Deleting..." : "Delete Message"}
+                        <Button
+                            size="xs"
+                            variant={selected ? "primary" : "secondary"}
+                            disabled={deleting}
+                            onClick={onToggleSelected}
+                        >
+                            {deleting ? "Deleting..." : selected ? "Selected" : "Select"}
                         </Button>
                     </div>
                 </div>
@@ -164,20 +420,56 @@ function RecordCard({
 function SendTrailTab() {
     const currentUserId = useStateFromStores([UserStore], () => UserStore.getCurrentUser()?.id ?? null);
     const [records, pending] = useSentTrailRecords(currentUserId);
+    const purgeConfig = settings.use(["purgeTarget", "protectAllDms", "protectedDmChannels"]);
+    const protectedDmChannels = React.useMemo(
+        () => parseProtectedDmChannels(purgeConfig.protectedDmChannels),
+        [purgeConfig.protectedDmChannels],
+    );
+    const purgeTarget = purgeConfig.purgeTarget as SendTrailPurgeTarget;
 
     const [scope, setScope] = React.useState<ScopeValue>("all");
     const [kind, setKind] = React.useState<KindValue>("all");
     const [period, setPeriod] = React.useState<PeriodValue>("all");
     const [query, setQuery] = React.useState("");
+    const [selectedIds, setSelectedIds] = React.useState<Set<string>>(() => new Set());
     const [deletingIds, setDeletingIds] = React.useState<Set<string>>(() => new Set());
+    const [purgeStatus, setPurgeStatus] = React.useState<PurgeStatusState>(makeEmptyPurgeStatus);
+    const purgeStatusTimerRef = React.useRef<number | null>(null);
 
-    const updateDeletingIds = React.useCallback((recordsToUpdate: SentTrailRecord[], active: boolean) => {
+    React.useEffect(() => {
+        return () => {
+            if (purgeStatusTimerRef.current) {
+                window.clearTimeout(purgeStatusTimerRef.current);
+            }
+        };
+    }, []);
+
+    React.useEffect(() => {
+        const recordIds = new Set(records.map(record => record.id));
+        setSelectedIds(current => {
+            const next = new Set(Array.from(current).filter(id => recordIds.has(id)));
+            return next.size === current.size ? current : next;
+        });
+    }, [records]);
+
+    React.useEffect(() => {
+        if (purgeStatus.phase === "running" || purgeStatus.phase === "idle") return;
+
+        if (purgeStatusTimerRef.current) {
+            window.clearTimeout(purgeStatusTimerRef.current);
+        }
+
+        purgeStatusTimerRef.current = window.setTimeout(() => {
+            setPurgeStatus(makeEmptyPurgeStatus());
+            purgeStatusTimerRef.current = null;
+        }, PURGE_STATUS_HIDE_DELAY_MS);
+    }, [purgeStatus]);
+
+    const updateDeletingId = React.useCallback((recordId: string, active: boolean) => {
         setDeletingIds(current => {
             const next = new Set(current);
-            for (const record of recordsToUpdate) {
-                if (active) next.add(record.id);
-                else next.delete(record.id);
-            }
+            if (active) next.add(recordId);
+            else next.delete(recordId);
             return next;
         });
     }, []);
@@ -206,6 +498,18 @@ function SendTrailTab() {
         ];
     }, [records]);
 
+    const periodOptions: SelectOption<PeriodValue>[] = [
+        { label: "All time", value: "all" },
+        { label: "Last 24 hours", value: "24h" },
+        { label: "Last 7 days", value: "7d" },
+    ];
+
+    const kindOptions: SelectOption<KindValue>[] = [
+        { label: "Everything", value: "all" },
+        { label: "Text only", value: "text" },
+        { label: "Media only", value: "media" },
+    ];
+
     const filteredRecords = React.useMemo(() => {
         const search = query.trim().toLowerCase();
         const cutoff = period === "24h"
@@ -216,14 +520,10 @@ function SendTrailTab() {
 
         return records.filter(record => {
             if (!recordMatchesScope(record, scope)) return false;
-
             if (kind === "text" && !record.hasText) return false;
             if (kind === "media" && !record.hasMedia) return false;
-
             if (cutoff && record.timestamp < cutoff) return false;
-
             if (search && !buildSearchIndex(record).includes(search)) return false;
-
             return true;
         });
     }, [kind, period, query, records, scope]);
@@ -244,71 +544,178 @@ function SendTrailTab() {
         }));
     }, [filteredRecords]);
 
-    const latestRecord = records[0] ?? null;
-    const totalMedia = records.filter(record => record.hasMedia).length;
-    const totalText = records.filter(record => record.hasText).length;
-    const isBusy = deletingIds.size > 0;
+    const selectedRecords = React.useMemo(
+        () => records.filter(record => selectedIds.has(record.id)),
+        [records, selectedIds],
+    );
 
-    const periodOptions: SelectOption<PeriodValue>[] = [
-        { label: "All time", value: "all" },
-        { label: "Last 24 hours", value: "24h" },
-        { label: "Last 7 days", value: "7d" },
-    ];
+    const selectedEligibleRecords = React.useMemo(
+        () => selectedRecords.filter(record => !isRecordProtected(record, purgeTarget, purgeConfig.protectAllDms, protectedDmChannels)),
+        [protectedDmChannels, purgeConfig.protectAllDms, purgeTarget, selectedRecords],
+    );
 
-    const kindOptions: SelectOption<KindValue>[] = [
-        { label: "Everything", value: "all" },
-        { label: "Text only", value: "text" },
-        { label: "Media only", value: "media" },
-    ];
+    const allVisibleSelected = filteredRecords.length > 0 && filteredRecords.every(record => selectedIds.has(record.id));
+    const protectedSelectedCount = selectedRecords.length - selectedEligibleRecords.length;
+    const dmConversationCount = React.useMemo(() => buildDmConversations(records).length, [records]);
+    const isBusy = purgeStatus.phase === "running";
 
-    const scopeLabel = scopeOptions.find(option => option.value === scope)?.label ?? "All destinations";
+    const toggleVisibleSelection = React.useCallback(() => {
+        setSelectedIds(current => {
+            const next = new Set(current);
 
-    const deleteLiveMessages = React.useCallback(async (targetRecords: SentTrailRecord[]) => {
+            if (filteredRecords.length === 0) return next;
+
+            if (filteredRecords.every(record => next.has(record.id))) {
+                for (const record of filteredRecords) next.delete(record.id);
+            } else {
+                for (const record of filteredRecords) next.add(record.id);
+            }
+
+            return next;
+        });
+    }, [filteredRecords]);
+
+    const clearSelection = React.useCallback(() => setSelectedIds(new Set()), []);
+
+    const toggleRecordSelection = React.useCallback((recordId: string) => {
+        setSelectedIds(current => {
+            const next = new Set(current);
+            if (next.has(recordId)) next.delete(recordId);
+            else next.add(recordId);
+            return next;
+        });
+    }, []);
+
+    const openConfigModal = React.useCallback(() => {
+        const modalKey = openModal(modalProps => (
+            <SendTrailConfigModal
+                modalProps={modalProps}
+                close={() => closeModal(modalKey)}
+                records={records}
+            />
+        ));
+    }, [records]);
+
+    const runPurge = React.useCallback(async (targetRecords: SentTrailRecord[]) => {
         if (!currentUserId || targetRecords.length === 0) return;
 
-        updateDeletingIds(targetRecords, true);
+        if (purgeStatusTimerRef.current) {
+            window.clearTimeout(purgeStatusTimerRef.current);
+            purgeStatusTimerRef.current = null;
+        }
 
-        const removedIds = new Set<string>();
+        const eligibleRecords = targetRecords.filter(record =>
+            !isRecordProtected(record, purgeTarget, purgeConfig.protectAllDms, protectedDmChannels),
+        );
+        const skipped = targetRecords.length - eligibleRecords.length;
+
+        if (eligibleRecords.length === 0) {
+            setPurgeStatus({
+                phase: "failure",
+                total: 0,
+                processed: 0,
+                deleted: 0,
+                failed: 0,
+                skipped,
+                currentLabel: undefined,
+            });
+            showToast("Nothing in the current selection is allowed by your purge config.", Toasts.Type.FAILURE);
+            return;
+        }
+
+        let deleted = 0;
         let failed = 0;
 
-        try {
-            for (const record of targetRecords) {
-                try {
-                    await MessageActions.deleteMessage(record.channelId, record.messageId);
-                    removedIds.add(record.id);
-                    await sleep(LIVE_DELETE_DELAY_MS);
-                } catch (error) {
-                    failed++;
-                }
+        setPurgeStatus({
+            phase: "running",
+            total: eligibleRecords.length,
+            processed: 0,
+            deleted: 0,
+            failed: 0,
+            skipped,
+            currentLabel: undefined,
+        });
+
+        for (const [index, record] of eligibleRecords.entries()) {
+            const context = resolveRecordContext(record);
+
+            updateDeletingId(record.id, true);
+            setPurgeStatus(current => ({
+                ...current,
+                currentLabel: context.isDirectMessage ? context.channelName : `#${context.channelName}`,
+            }));
+
+            try {
+                await MessageActions.deleteMessage(record.channelId, record.messageId);
+                await removeSentTrailRecord(currentUserId, record.channelId, record.messageId);
+
+                deleted++;
+                setSelectedIds(current => {
+                    if (!current.has(record.id)) return current;
+                    const next = new Set(current);
+                    next.delete(record.id);
+                    return next;
+                });
+            } catch (error) {
+                failed++;
+            } finally {
+                updateDeletingId(record.id, false);
+                setPurgeStatus(current => ({
+                    ...current,
+                    processed: index + 1,
+                    deleted,
+                    failed,
+                }));
             }
 
-            if (removedIds.size > 0) {
-                await removeSentTrailRecordsWhere(currentUserId, record => removedIds.has(record.id));
+            if (index < eligibleRecords.length - 1) {
+                await sleep(LIVE_DELETE_DELAY_MS);
             }
-
-            if (removedIds.size > 0 && failed === 0) {
-                showToast(`Deleted ${removedIds.size} message${removedIds.size === 1 ? "" : "s"} from Discord.`, Toasts.Type.SUCCESS);
-            } else if (removedIds.size > 0 && failed > 0) {
-                showToast(`Deleted ${removedIds.size} message${removedIds.size === 1 ? "" : "s"}, but ${failed} failed.`, Toasts.Type.FAILURE);
-            } else {
-                showToast("No messages could be deleted from Discord.", Toasts.Type.FAILURE);
-            }
-        } finally {
-            updateDeletingIds(targetRecords, false);
         }
-    }, [currentUserId, updateDeletingIds]);
 
-    const confirmDeleteRecords = React.useCallback((targetRecords: SentTrailRecord[], title: string, body: string) => {
+        const phase: PurgeStatusPhase = failed === 0
+            ? "success"
+            : deleted > 0
+                ? "partial"
+                : "failure";
+
+        setPurgeStatus({
+            phase,
+            total: eligibleRecords.length,
+            processed: eligibleRecords.length,
+            deleted,
+            failed,
+            skipped,
+            currentLabel: undefined,
+        });
+
+        if (phase === "success") {
+            showToast(`Purged ${deleted} message${deleted === 1 ? "" : "s"} from Discord.`, Toasts.Type.SUCCESS);
+        } else if (phase === "partial") {
+            showToast(`Purged ${deleted} message${deleted === 1 ? "" : "s"}, but ${failed} failed.`, Toasts.Type.FAILURE);
+        } else {
+            showToast("No selected messages could be purged from Discord.", Toasts.Type.FAILURE);
+        }
+    }, [currentUserId, protectedDmChannels, purgeConfig.protectAllDms, purgeTarget, updateDeletingId]);
+
+    const confirmPurge = React.useCallback(() => {
+        if (selectedRecords.length === 0) return;
+
+        const eligibleCount = selectedEligibleRecords.length;
+        const skippedCount = selectedRecords.length - eligibleCount;
+
         Alerts.show({
-            title,
-            body,
-            confirmText: "Delete",
+            title: `Purge ${selectedRecords.length} selected message${selectedRecords.length === 1 ? "" : "s"}?`,
+            body: eligibleCount === 0
+                ? "Everything selected is currently protected by your purge config."
+                : `Send Trail will delete ${eligibleCount} selected message${eligibleCount === 1 ? "" : "s"} from Discord one by one.${skippedCount ? ` ${skippedCount} selected entr${skippedCount === 1 ? "y is" : "ies are"} protected by config and will be skipped.` : ""}`,
+            confirmText: "Start Purge",
             cancelText: "Cancel",
             async onConfirm() {
-                await deleteLiveMessages(targetRecords);
+                await runPurge(selectedRecords);
             },
         });
-    }, [deleteLiveMessages]);
+    }, [runPurge, selectedEligibleRecords.length, selectedRecords]);
 
     const confirmLocalClear = React.useCallback(() => {
         Alerts.show({
@@ -318,6 +725,7 @@ function SendTrailTab() {
             cancelText: "Cancel",
             async onConfirm() {
                 await clearSentTrailRecords(currentUserId);
+                setSelectedIds(new Set());
                 showToast("Cleared local Send Trail history.", Toasts.Type.SUCCESS);
             },
         });
@@ -327,83 +735,58 @@ function SendTrailTab() {
         <SettingsTab>
             <SpecialCard
                 title="Send Trail"
-                subtitle="Global outbound cleanup"
-                description={`Review every message sent from ${BRAND_NAME}, filter it by destination or media type, and delete the visible set directly from Discord when you need to clean up fast.`}
+                subtitle="Selective outbound purge"
+                description={`Track what you send from ${BRAND_NAME}, choose exactly which messages should go, and purge them one by one without losing control of DMs or protected conversations.`}
                 cardImage={BRAND_ICON_DATA_URL}
                 backgroundImage={HERO_BACKGROUND}
                 backgroundColor="#27221d"
             >
                 <div className={cl("hero-metrics")}>
-                    <span className={cl("hero-pill")}>{records.length} tracked sends</span>
-                    <span className={cl("hero-pill")}>{totalMedia} media entries</span>
-                    <span className={cl("hero-pill")}>{totalText} text entries</span>
-                    <span className={cl("hero-pill")}>{filteredRecords.length} visible right now</span>
+                    <span className={cl("hero-tag")}>{records.length} tracked</span>
+                    <span className={cl("hero-tag")}>{filteredRecords.length} visible</span>
+                    <span className={cl("hero-tag")}>{selectedRecords.length} selected</span>
+                    <span className={cl("hero-tag")}>{dmConversationCount} DM threads known</span>
                 </div>
             </SpecialCard>
 
             <Notice.Info className={Margins.top20} style={{ width: "100%" }}>
-                Send Trail stores a local index of your sent messages on this device. Deleting from this page can remove the actual Discord messages, while clearing local history only removes the index shown here.
+                Send Trail is local to this device. `Purge Selected` deletes the real Discord messages one by one, while `Clear Local History` only removes the saved index shown here.
             </Notice.Info>
 
-            <Heading className={Margins.top20}>Actions</Heading>
+            <Heading className={Margins.top20}>History</Heading>
             <Paragraph className={Margins.bottom16}>
-                Use your current filters to decide what will be affected before deleting anything live.
+                Filter the log, select the entries you want gone, then let Send Trail purge them safely.
             </Paragraph>
-
-            <QuickActionCard columns={3}>
-                <QuickAction
-                    Icon={LinkIcon}
-                    text="Open Latest Message"
-                    disabled={!latestRecord || isBusy}
-                    action={() => latestRecord && NavigationRouter.transitionTo(latestRecord.jumpLink)}
-                />
-                <QuickAction
-                    Icon={DeleteIcon}
-                    text="Delete Visible Messages"
-                    disabled={filteredRecords.length === 0 || isBusy}
-                    action={() => confirmDeleteRecords(
-                        filteredRecords,
-                        `Delete ${filteredRecords.length} visible message${filteredRecords.length === 1 ? "" : "s"}?`,
-                        `This will delete the currently visible messages from Discord itself and remove them from Send Trail.`,
-                    )}
-                />
-                <QuickAction
-                    Icon={LogIcon}
-                    text="Clear Local History"
-                    disabled={records.length === 0 || isBusy}
-                    action={confirmLocalClear}
-                />
-            </QuickActionCard>
-
-            <Divider className={Margins.top20} />
-
-            <Heading className={Margins.top20}>Current View</Heading>
-            <Paragraph className={Margins.bottom16}>
-                Narrow the list down first, then use “Delete Visible Messages” to wipe the live messages that match.
-            </Paragraph>
-
-            <Card className={cl("summary-card")} defaultPadding>
-                <div className={cl("summary-row")}>
-                    <div className={cl("summary-block")}>
-                        <span className={cl("summary-label")}>Scope</span>
-                        <span className={cl("summary-value")}>{scopeLabel}</span>
-                    </div>
-                    <div className={cl("summary-block")}>
-                        <span className={cl("summary-label")}>Type</span>
-                        <span className={cl("summary-value")}>{kindOptions.find(option => option.value === kind)?.label ?? "Everything"}</span>
-                    </div>
-                    <div className={cl("summary-block")}>
-                        <span className={cl("summary-label")}>Period</span>
-                        <span className={cl("summary-value")}>{periodOptions.find(option => option.value === period)?.label ?? "All time"}</span>
-                    </div>
-                    <div className={cl("summary-block")}>
-                        <span className={cl("summary-label")}>Visible</span>
-                        <span className={cl("summary-value")}>{filteredRecords.length} message{filteredRecords.length === 1 ? "" : "s"}</span>
-                    </div>
-                </div>
-            </Card>
 
             <Card className={cl("toolbar-card")} defaultPadding>
+                <div className={cl("toolbar-topline")}>
+                    <div className={cl("meta-row")}>
+                        <span className={cl("meta-tag")}>{filteredRecords.length} visible</span>
+                        <span className={cl("meta-tag")}>{selectedRecords.length} selected</span>
+                        <span className={cl("meta-tag", "accent")}>{selectedEligibleRecords.length} eligible</span>
+                        {!!protectedSelectedCount && (
+                            <span className={cl("meta-tag", "protected")}>{protectedSelectedCount} protected</span>
+                        )}
+                    </div>
+
+                    <div className={cl("toolbar-actions")}>
+                        <Button size="small" variant="secondary" disabled={filteredRecords.length === 0 || isBusy} onClick={toggleVisibleSelection}>
+                            {allVisibleSelected ? "Unselect Visible" : "Select Visible"}
+                        </Button>
+                        <Button size="small" variant="secondary" disabled={selectedRecords.length === 0 || isBusy} onClick={clearSelection}>
+                            Clear Selection
+                        </Button>
+                        <Button size="small" variant="secondary" disabled={isBusy} onClick={openConfigModal}>
+                            <CogWheel width={16} height={16} />
+                            <span className={cl("button-label")}>Purge Config</span>
+                        </Button>
+                        <Button size="small" variant="dangerPrimary" disabled={selectedRecords.length === 0 || isBusy} onClick={confirmPurge}>
+                            <DeleteIcon width={16} height={16} />
+                            <span className={cl("button-label")}>Purge Selected</span>
+                        </Button>
+                    </div>
+                </div>
+
                 <div className={cl("toolbar-grid")}>
                     <div className={cl("toolbar-field")}>
                         <Paragraph className={cl("field-label")}>Destination</Paragraph>
@@ -412,6 +795,7 @@ function SendTrailTab() {
                             select={(value: ScopeValue) => setScope(value)}
                             isSelected={(value: ScopeValue) => scope === value}
                             serialize={(value: ScopeValue) => value}
+                            isDisabled={isBusy}
                         />
                     </div>
 
@@ -422,6 +806,7 @@ function SendTrailTab() {
                             select={(value: KindValue) => setKind(value)}
                             isSelected={(value: KindValue) => kind === value}
                             serialize={(value: KindValue) => value}
+                            isDisabled={isBusy}
                         />
                     </div>
 
@@ -432,6 +817,7 @@ function SendTrailTab() {
                             select={(value: PeriodValue) => setPeriod(value)}
                             isSelected={(value: PeriodValue) => period === value}
                             serialize={(value: PeriodValue) => value}
+                            isDisabled={isBusy}
                         />
                     </div>
 
@@ -439,24 +825,32 @@ function SendTrailTab() {
                         <Paragraph className={cl("field-label")}>Search</Paragraph>
                         <TextInput
                             value={query}
-                            placeholder="Search content, server, channel, filename, or media URL..."
+                            placeholder="Search content, server, channel, or media..."
                             onChange={setQuery}
+                            disabled={isBusy}
                         />
                     </div>
                 </div>
+
+                <div className={cl("toolbar-footer")}>
+                    <Paragraph className={cl("toolbar-hint")}>
+                        Purge target: {purgeTarget === "all" ? "everything" : purgeTarget === "dms" ? "DMs only" : "servers only"}
+                        {purgeConfig.protectAllDms ? " · all DMs protected" : ""}
+                        {protectedDmChannels.size ? ` · ${protectedDmChannels.size} DM thread${protectedDmChannels.size === 1 ? "" : "s"} protected` : ""}
+                    </Paragraph>
+                    <TextButton variant="secondary" disabled={records.length === 0 || isBusy} onClick={confirmLocalClear}>
+                        Clear Local History
+                    </TextButton>
+                </div>
             </Card>
 
-            <Divider className={Margins.top20} />
-
-            <Heading className={Margins.top20}>History</Heading>
-            <Paragraph className={Margins.bottom16}>
-                Every entry below is a real message you sent. Open it, preview media directly, or delete it in place.
-            </Paragraph>
+            <PurgeStatusBanner status={purgeStatus} />
 
             {pending && (
-                <Notice.Info style={{ width: "100%" }}>
-                    Loading Send Trail history...
-                </Notice.Info>
+                <Card className={cl("empty-card")} defaultPadding>
+                    <LogIcon className={cl("empty-icon")} />
+                    <HeadingTertiary>Loading Send Trail history...</HeadingTertiary>
+                </Card>
             )}
 
             {!pending && records.length === 0 && (
@@ -483,7 +877,7 @@ function SendTrailTab() {
                 <div key={group.label} className={cl("group")}>
                     <div className={cl("group-header")}>
                         <HeadingTertiary className={Margins.reset}>{group.label}</HeadingTertiary>
-                        <span className={cl("group-count")}>
+                        <span className={cl("meta-tag")}>
                             {group.records.length} entr{group.records.length === 1 ? "y" : "ies"}
                         </span>
                     </div>
@@ -493,12 +887,10 @@ function SendTrailTab() {
                             <RecordCard
                                 key={record.id}
                                 record={record}
+                                selected={selectedIds.has(record.id)}
                                 deleting={deletingIds.has(record.id)}
-                                onDelete={() => confirmDeleteRecords(
-                                    [record],
-                                    "Delete this message?",
-                                    "This will delete the selected message from Discord and remove it from Send Trail.",
-                                )}
+                                protectedFromPurge={isRecordProtected(record, purgeTarget, purgeConfig.protectAllDms, protectedDmChannels)}
+                                onToggleSelected={() => toggleRecordSelection(record.id)}
                             />
                         ))}
                     </div>

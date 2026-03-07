@@ -8,6 +8,7 @@ import definePlugin from "@utils/types";
 import { ChannelStore, GuildStore, MessageStore, UserStore } from "@webpack/common";
 
 import SendTrailTab from "./SendTrailTab";
+import { settings } from "./settings";
 import { appendSentTrailRecord, mergeSentTrailRecordMedia, removeSentTrailRecord } from "./store";
 import type { MessageCreatePayload, MessageDeletePayload, MessageUpdatePayload, PendingSendDraft, SentTrailRecord } from "./types";
 import { buildJumpLink, collectMediaItems, getMessageTimestamp, getRecordPreview, hasMediaLinks, makeAttachmentSignature, makeUploadSignature, normalizeContent } from "./utils";
@@ -218,12 +219,13 @@ function scheduleEnrichment(channelId: string, messageId: string, guildId?: stri
 
 export default definePlugin({
     name: "SendTrail",
-    description: "Tracks your newly sent messages in a dedicated Kamidere settings page.",
+    description: "Tracks your newly sent messages, lets you select them, and purges them in a dedicated Kamidere settings page.",
     authors: [Devs.Megu],
     dependencies: ["Settings", "MessageEventsAPI"],
     enabledByDefault: true,
     tags: ["kamidere", "chat", "utility"],
     requiresRestart: false,
+    settings,
 
     start() {
         SettingsPlugin.customEntries.push({
