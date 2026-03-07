@@ -428,6 +428,10 @@
     margin-top: 14px;
 }
 
+.vc-send-trail-history-list-hold {
+    min-height: 156px;
+}
+
 .vc-send-trail-history-footer {
     margin-top: 16px;
     padding-top: 14px;

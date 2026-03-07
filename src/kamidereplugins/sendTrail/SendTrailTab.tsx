@@ -1047,6 +1047,7 @@ function SendTrailTab() {
     const pageRangeStart = filteredRecords.length === 0 ? 0 : pageStartIndex + 1;
     const pageRangeEnd = filteredRecords.length === 0 ? 0 : Math.min(filteredRecords.length, pageStartIndex + pageSizeNumber);
     const purgeActionLabel = selectedRecords.length > 0 ? "Purge Selected" : "Purge All";
+    const shouldHoldEmptyState = purgeStatus.phase !== "idle" || renderedPurgeStatus.phase !== "idle";
 
     const changePage = React.useCallback((nextPage: number) => {
         keepFooterVisibleRef.current = true;
@@ -1362,7 +1363,7 @@ function SendTrailTab() {
                         </Card>
                     )}
 
-                    {!pending && records.length === 0 && (
+                    {!pending && records.length === 0 && !shouldHoldEmptyState && (
                         <Card className={cl("empty-card")} defaultPadding>
                             <LogIcon className={cl("empty-icon")} />
                             <HeadingTertiary>No saved sends yet</HeadingTertiary>
@@ -1372,7 +1373,7 @@ function SendTrailTab() {
                         </Card>
                     )}
 
-                    {!pending && records.length > 0 && filteredRecords.length === 0 && (
+                    {!pending && records.length > 0 && filteredRecords.length === 0 && !shouldHoldEmptyState && (
                         <Card className={cl("empty-card")} defaultPadding>
                             <LogIcon className={cl("empty-icon")} />
                             <HeadingTertiary>No results match this view</HeadingTertiary>
@@ -1380,6 +1381,10 @@ function SendTrailTab() {
                                 Broaden the destination, type, period, or search query to bring more sent messages into view.
                             </Paragraph>
                         </Card>
+                    )}
+
+                    {!pending && groupedRecords.length === 0 && shouldHoldEmptyState && (
+                        <div className={cl("history-list-hold")} aria-hidden="true" />
                     )}
 
                     {groupedRecords.map(group => (
