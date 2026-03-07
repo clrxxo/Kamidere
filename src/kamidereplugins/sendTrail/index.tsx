@@ -16,6 +16,7 @@ import { buildJumpLink, collectMediaItems, getChannelRecipientIds, getMessageTim
 const DRAFT_TTL_MS = 20_000;
 const MIN_MATCH_SCORE = 4;
 const SEND_TRAIL_SETTINGS_KEY = "kamidere_send_trail";
+const SEND_TRAIL_SETTINGS_PANEL_KEY = `${SEND_TRAIL_SETTINGS_KEY}_panel`;
 const SEND_TRAIL_SETTINGS_SECTION = "KamidereSendTrail";
 
 let draftCounter = 0;
@@ -227,9 +228,11 @@ function unregisterSendTrailSettingsTab() {
         removeFromArray(SettingsPlugin.customEntries, entry => entry.key === SEND_TRAIL_SETTINGS_KEY);
     }
 
-    while (SettingsPlugin.settingsSectionMap.some(entry => entry[1] === SEND_TRAIL_SETTINGS_KEY)) {
-        removeFromArray(SettingsPlugin.settingsSectionMap, entry => entry[1] === SEND_TRAIL_SETTINGS_KEY);
+    while (SettingsPlugin.settingsSectionMap.some(entry => entry[1] === SEND_TRAIL_SETTINGS_PANEL_KEY)) {
+        removeFromArray(SettingsPlugin.settingsSectionMap, entry => entry[1] === SEND_TRAIL_SETTINGS_PANEL_KEY);
     }
+
+    SettingsPlugin.invalidateSectionLayout();
 }
 
 function registerSendTrailSettingsTab() {
@@ -242,7 +245,8 @@ function registerSendTrailSettingsTab() {
         Icon: ClockIcon,
     });
 
-    SettingsPlugin.settingsSectionMap.push([SEND_TRAIL_SETTINGS_SECTION, SEND_TRAIL_SETTINGS_KEY]);
+    SettingsPlugin.settingsSectionMap.push([SEND_TRAIL_SETTINGS_SECTION, SEND_TRAIL_SETTINGS_PANEL_KEY]);
+    SettingsPlugin.invalidateSectionLayout();
 }
 
 export default definePlugin({
@@ -255,7 +259,7 @@ export default definePlugin({
     requiresRestart: false,
     settings,
     settingsTab: {
-        route: `${SEND_TRAIL_SETTINGS_KEY}_panel`,
+        route: SEND_TRAIL_SETTINGS_PANEL_KEY,
         title: "Send Trail",
     },
 

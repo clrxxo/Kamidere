@@ -89,6 +89,8 @@ interface SettingsLayoutBuilder {
     buildLayout(): SettingsLayoutNode[];
 }
 
+const SECTION_KEY_PREFIX = "equicord_section";
+
 const settings = definePluginSettings({
     settingsLocation: {
         type: OptionType.SELECT,
@@ -196,6 +198,12 @@ export default definePlugin({
         return settingsSectionMap;
     },
 
+    layoutVersion: 0,
+
+    invalidateSectionLayout() {
+        this.layoutVersion++;
+    },
+
     getSectionEntries() {
         const { buildEntry } = this;
 
@@ -260,13 +268,15 @@ export default definePlugin({
         if (originalLayoutBuilder.key !== "$Root") return layout;
         if (!Array.isArray(layout)) return layout;
 
-        const existingSectionIndex = layout.findIndex(s => s?.key === "equicord_section");
-        if (existingSectionIndex !== -1) {
-            layout.splice(existingSectionIndex, 1);
+        for (let index = layout.length - 1; index >= 0; index--) {
+            const key = layout[index]?.key;
+            if (typeof key === "string" && key.startsWith(SECTION_KEY_PREFIX)) {
+                layout.splice(index, 1);
+            }
         }
 
         const equicordSection: SettingsLayoutNode = {
-            key: "equicord_section",
+            key: `${SECTION_KEY_PREFIX}_${this.layoutVersion}`,
             type: LayoutTypes.SECTION,
             useTitle: () => `${BRAND_NAME} Settings`,
             buildLayout: () => this.getSectionEntries()
