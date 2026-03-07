@@ -1046,45 +1046,52 @@ function SendTrailTab() {
                             Showing {pageRangeStart}-{pageRangeEnd} of {filteredRecords.length} matching message{filteredRecords.length === 1 ? "" : "s"}.
                         </Paragraph>
                         <Paragraph className={cl("history-summary")}>
-                            Local history stays on this device. Purge removes live Discord messages one by one.
+                            Local only. Purge deletes live Discord messages one by one.
                         </Paragraph>
                     </div>
 
                     <div className={cl("history-footer-actions")}>
-                        <div className={cl("pagination-field")}>
-                            <Paragraph className={cl("field-label")}>Messages</Paragraph>
-                            <Select
-                                options={pageSizeOptions}
-                                select={(value: PageSizeValue) => setPageSize(value)}
-                                isSelected={(value: PageSizeValue) => pageSize === value}
-                                serialize={(value: PageSizeValue) => value}
-                                isDisabled={isBusy || filteredRecords.length === 0}
-                            />
+                        <div className={cl("history-pagination-row")}>
+                            <div className={cl("pagination-field")}>
+                                <Paragraph className={cl("field-label")}>Messages</Paragraph>
+                                <Select
+                                    options={pageSizeOptions}
+                                    select={(value: PageSizeValue) => setPageSize(value)}
+                                    isSelected={(value: PageSizeValue) => pageSize === value}
+                                    serialize={(value: PageSizeValue) => value}
+                                    isDisabled={isBusy || filteredRecords.length === 0}
+                                />
+                            </div>
+
+                            <div className={cl("pagination-controls")}>
+                                <Button
+                                    size="xs"
+                                    variant="secondary"
+                                    disabled={currentPage <= 1 || filteredRecords.length === 0 || isBusy}
+                                    onClick={() => setCurrentPage(page => Math.max(1, page - 1))}
+                                >
+                                    Prev
+                                </Button>
+                                <span className={cl("pagination-status")}>
+                                    {currentPage} / {totalPages}
+                                </span>
+                                <Button
+                                    size="xs"
+                                    variant="secondary"
+                                    disabled={currentPage >= totalPages || filteredRecords.length === 0 || isBusy}
+                                    onClick={() => setCurrentPage(page => Math.min(totalPages, page + 1))}
+                                >
+                                    Next
+                                </Button>
+                            </div>
                         </div>
 
-                        <div className={cl("pagination-controls")}>
-                            <Button
-                                size="xs"
-                                variant="secondary"
-                                disabled={currentPage <= 1 || filteredRecords.length === 0 || isBusy}
-                                onClick={() => setCurrentPage(page => Math.max(1, page - 1))}
-                            >
-                                Previous
-                            </Button>
-                            <span className={cl("pagination-status")}>
-                                Page {currentPage} / {totalPages}
-                            </span>
-                            <Button
-                                size="xs"
-                                variant="secondary"
-                                disabled={currentPage >= totalPages || filteredRecords.length === 0 || isBusy}
-                                onClick={() => setCurrentPage(page => Math.min(totalPages, page + 1))}
-                            >
-                                Next
-                            </Button>
-                        </div>
-
-                        <TextButton variant="secondary" disabled={records.length === 0 || isBusy} onClick={confirmLocalClear}>
+                        <TextButton
+                            variant="secondary"
+                            className={cl("history-footer-clear")}
+                            disabled={records.length === 0 || isBusy}
+                            onClick={confirmLocalClear}
+                        >
                             Clear Local History
                         </TextButton>
                     </div>
