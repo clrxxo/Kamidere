@@ -249,6 +249,10 @@ export default definePlugin({
     tags: ["kamidere", "chat", "utility"],
     requiresRestart: false,
     settings,
+    settingsTab: {
+        route: `${SEND_TRAIL_SETTINGS_KEY}_panel`,
+        title: "Send Trail",
+    },
 
     start() {
         registerSendTrailSettingsTab();

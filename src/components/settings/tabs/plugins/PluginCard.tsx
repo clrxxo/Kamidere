@@ -11,7 +11,7 @@ import { AddonCard } from "@components/settings/AddonCard";
 import { classNameFactory } from "@utils/css";
 import { Logger } from "@utils/Logger";
 import { OptionType, Plugin } from "@utils/types";
-import { React, showToast, Toasts } from "@webpack/common";
+import { React, SettingsRouter, showToast, Toasts } from "@webpack/common";
 import { Settings } from "Vencord";
 
 import { PluginMeta } from "~plugins";
@@ -31,13 +31,63 @@ interface PluginCardProps extends React.HTMLProps<HTMLDivElement> {
     onMouseLeave?: React.MouseEventHandler<HTMLDivElement>;
 }
 
+const SETTINGS_TAB_STATUS_HIDE_DELAY_MS = 2200;
+const SETTINGS_TAB_STATUS_TRANSITION_MS = 280;
+
 export function PluginCard({ plugin, disabled, onRestartNeeded, onMouseEnter, onMouseLeave, isNew }: PluginCardProps) {
     const settings = Settings.plugins[plugin.name];
     const pluginMeta = PluginMeta[plugin.name];
     const isUserPlugin = pluginMeta?.userPlugin ?? false;
     const sourceInfo = getPluginSourceInfo(pluginMeta?.folderName, isUserPlugin, plugin.isModified ?? false);
+    const [renderedSettingsTabStatus, setRenderedSettingsTabStatus] = React.useState<null | { enabled: boolean; }>(null);
+    const [isSettingsTabStatusVisible, setIsSettingsTabStatusVisible] = React.useState(false);
+    const settingsTabStatusHideTimerRef = React.useRef<number | null>(null);
+    const settingsTabStatusUnmountTimerRef = React.useRef<number | null>(null);
 
     const isEnabled = () => isPluginEnabled(plugin.name);
+
+    React.useEffect(() => () => {
+        if (settingsTabStatusHideTimerRef.current !== null) {
+            window.clearTimeout(settingsTabStatusHideTimerRef.current);
+        }
+
+        if (settingsTabStatusUnmountTimerRef.current !== null) {
+            window.clearTimeout(settingsTabStatusUnmountTimerRef.current);
+        }
+    }, []);
+
+    function refreshPluginSettingsView() {
+        if (!plugin.settingsTab) return;
+
+        window.requestAnimationFrame(() => {
+            void SettingsRouter.openUserSettings("equicord_plugins_panel");
+        });
+    }
+
+    function showSettingsTabStatus(enabled: boolean) {
+        if (!plugin.settingsTab) return;
+
+        if (settingsTabStatusHideTimerRef.current !== null) {
+            window.clearTimeout(settingsTabStatusHideTimerRef.current);
+            settingsTabStatusHideTimerRef.current = null;
+        }
+
+        if (settingsTabStatusUnmountTimerRef.current !== null) {
+            window.clearTimeout(settingsTabStatusUnmountTimerRef.current);
+            settingsTabStatusUnmountTimerRef.current = null;
+        }
+
+        setRenderedSettingsTabStatus({ enabled });
+        window.requestAnimationFrame(() => setIsSettingsTabStatusVisible(true));
+
+        settingsTabStatusHideTimerRef.current = window.setTimeout(() => {
+            setIsSettingsTabStatusVisible(false);
+            settingsTabStatusUnmountTimerRef.current = window.setTimeout(() => {
+                setRenderedSettingsTabStatus(null);
+                settingsTabStatusUnmountTimerRef.current = null;
+            }, SETTINGS_TAB_STATUS_TRANSITION_MS);
+        }, SETTINGS_TAB_STATUS_HIDE_DELAY_MS);
+    }
 
     function toggleEnabled() {
         const wasEnabled = isEnabled();
@@ -87,6 +137,11 @@ export function PluginCard({ plugin, disabled, onRestartNeeded, onMouseEnter, on
         }
 
         settings.enabled = !wasEnabled;
+
+        if (plugin.settingsTab) {
+            refreshPluginSettingsView();
+            showSettingsTabStatus(!wasEnabled);
+        }
     }
 
     const sourceBadge = (
@@ -109,6 +164,28 @@ export function PluginCard({ plugin, disabled, onRestartNeeded, onMouseEnter, on
             disabled={disabled}
             onMouseEnter={onMouseEnter}
             onMouseLeave={onMouseLeave}
+            footer={renderedSettingsTabStatus && (
+                <div
+                    className={cl(
+                        "settings-tab-status-region",
+                        isSettingsTabStatusVisible ? "settings-tab-status-region-visible" : "settings-tab-status-region-hidden",
+                    )}
+                >
+                    <div
+                        className={cl(
+                            "settings-tab-status",
+                            renderedSettingsTabStatus.enabled ? "settings-tab-status-enabled" : "settings-tab-status-disabled",
+                        )}
+                    >
+                        <span className={cl("settings-tab-status-dot")} />
+                        <span className={cl("settings-tab-status-copy")}>
+                            {renderedSettingsTabStatus.enabled
+                                ? `${plugin.settingsTab?.title} tab added to Kamidere Settings.`
+                                : `${plugin.settingsTab?.title} tab removed from Kamidere Settings.`}
+                        </span>
+                    </div>
+                </div>
+            )}
             infoButton={
                 <button
                     role="switch"

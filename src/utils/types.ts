@@ -162,6 +162,14 @@ export interface PluginDef {
      */
     settingsAboutComponent?: React.ComponentType<{}>;
     /**
+     * Metadata for plugins that expose their own page inside the Kamidere/Vencord settings tree.
+     * Used to refresh the settings modal and surface nicer enable/disable UX.
+     */
+    settingsTab?: {
+        route: string;
+        title: string;
+    };
+    /**
      * Allows you to subscribe to Flux events
      */
     flux?: Partial<{
