@@ -81,7 +81,7 @@
 
 .vc-presence-lab-history-card {
     margin-top: 0;
-    min-height: 560px;
+    min-height: 420px;
 }
 
 .vc-presence-lab-hero-tags {
@@ -152,6 +152,16 @@
     align-items: center;
     justify-content: space-between;
     gap: 14px;
+}
+
+.vc-presence-lab-section-head {
+    flex-wrap: wrap;
+    align-items: flex-start;
+}
+
+.vc-presence-lab-section-head > :first-child {
+    flex: 1 1 220px;
+    min-width: 0;
 }
 
 .vc-presence-lab-cadence-icons {
@@ -326,7 +336,7 @@
     width: 100%;
     height: 100%;
     border-radius: inherit;
-    background: color-mix(in srgb, var(--background-secondary) 94%, black 6%);
+    background: transparent;
 }
 
 .vc-presence-lab-gauge-value {
@@ -420,6 +430,10 @@
     padding: 20px;
 }
 
+.vc-presence-lab-runtime-card {
+    border-radius: 10px;
+}
+
 .vc-presence-lab-panel-title {
     margin: 0;
 }
@@ -431,6 +445,7 @@
 
 .vc-presence-lab-runtime-stat {
     padding: 14px;
+    border-radius: 8px;
 }
 
 .vc-presence-lab-field-grid {
@@ -473,6 +488,12 @@
     padding: 11px 12px;
 }
 
+.vc-presence-lab-runtime-card .vc-presence-lab-input,
+.vc-presence-lab-runtime-card .vc-presence-lab-search-shell,
+.vc-presence-lab-runtime-card .vc-presence-lab-runtime-stat {
+    border-radius: 8px;
+}
+
 .vc-presence-lab-input:focus,
 .vc-presence-lab-search-input:focus {
     border-color: rgba(226, 177, 90, 0.45);
@@ -488,6 +509,26 @@
 .vc-presence-lab-toggle-row,
 .vc-presence-lab-runtime-footer {
     margin-top: 18px;
+}
+
+.vc-presence-lab-inline-actions {
+    justify-content: flex-start;
+    margin-top: 16px;
+}
+
+.vc-presence-lab-section-action-button,
+.vc-presence-lab-primary-action-button {
+    align-self: flex-start;
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+.vc-presence-lab-section-action-button {
+    margin-top: 6px;
+}
+
+.vc-presence-lab-primary-action-button {
+    margin-top: 2px;
 }
 
 .vc-presence-lab-empty-inline {

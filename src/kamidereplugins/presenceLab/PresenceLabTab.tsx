@@ -608,6 +608,86 @@ function PresenceLabTab() {
                         <ActivityStrip buckets={overview.weeklyBuckets} />
                         <PairList pairs={overview.pairStats} />
                     </div>
+
+                    <Card className={cl("panel-card", "history-card")} defaultPadding>
+                        <div className={cl("section-head")}>
+                            <div>
+                                <Heading className={cl("panel-title")} tag="h4">Activity History</Heading>
+                                <Paragraph className={cl("section-copy")}>A clean local record of the sessions you log inside Presence Lab.</Paragraph>
+                            </div>
+                            <div className={cl("section-chip")}>{data.sessions.length} total</div>
+                        </div>
+
+                        <div className={cl("history-toolbar")}>
+                            <label className={cl("search-shell")}>
+                                <MagnifyingGlassIcon className={cl("search-icon")} width={16} height={16} />
+                                <input className={cl("search-input")} type="text" value={historyQuery} placeholder="Search operators, targets, servers, channels, or notes" onChange={event => setHistoryQuery(event.currentTarget.value)} />
+                            </label>
+                        </div>
+
+                        {pending && (
+                            <Card className={cl("empty-card")}>
+                                <LogIcon className={cl("empty-icon")} />
+                                <HeadingTertiary>Loading Presence Lab...</HeadingTertiary>
+                            </Card>
+                        )}
+
+                        {!pending && filteredGroups.length === 0 && (
+                            <Card className={cl("empty-card")}>
+                                <Microphone className={cl("empty-icon")} />
+                                <HeadingTertiary>No local sessions yet</HeadingTertiary>
+                                <Paragraph>Save a manual or simulated session and it will start building the dashboard instantly.</Paragraph>
+                            </Card>
+                        )}
+
+                        {!pending && filteredGroups.length > 0 && (
+                            <div className={cl("session-groups")}>
+                                {filteredGroups.map(group => (
+                                    <div key={group.key} className={cl("session-group")}>
+                                        <div className={cl("session-group-header")}>
+                                            <HeadingTertiary className={Margins.reset}>{group.label}</HeadingTertiary>
+                                            <span className={cl("session-group-count")}>
+                                                {group.sessions.length} entr{group.sessions.length === 1 ? "y" : "ies"}
+                                            </span>
+                                        </div>
+
+                                        <div className={cl("session-list")}>
+                                            {group.sessions.map(session => (
+                                                <Card key={session.id} className={cl("session-entry")}>
+                                                    <div className={cl("session-entry-top")}>
+                                                        <div className={cl("session-entry-route")}>
+                                                            <img className={cl("session-avatar")} src={session.operatorAvatarUrl} alt="" />
+                                                            <span className={cl("session-arrow")}>-&gt;</span>
+                                                            <img className={cl("session-avatar")} src={session.targetAvatarUrl} alt="" />
+                                                            <div>
+                                                                <Paragraph className={cl("session-title")}>{session.operatorLabel} -&gt; {session.targetLabel}</Paragraph>
+                                                                <Paragraph className={cl("session-context")}>{getGuildLabel(session.guildName, session.channelName)}</Paragraph>
+                                                            </div>
+                                                        </div>
+
+                                                        <div className={cl("session-entry-meta")}>
+                                                            <span className={cl("session-badge")}>{session.outcome === "manual" ? "Manual" : "Simulated"}</span>
+                                                            <span className={cl("session-time")}>{formatDateTime(session.startedAt)}</span>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className={cl("session-entry-body")}>
+                                                        <div className={cl("session-duration-chip")}>{formatDurationMinutes(session.durationMinutes)}</div>
+                                                        <Paragraph className={cl("session-notes")}>{session.notes || "No extra notes for this session."}</Paragraph>
+                                                    </div>
+
+                                                    <div className={cl("session-entry-footer")}>
+                                                        <Paragraph className={cl("session-footnote")}>Logged locally by {BRAND_NAME}. No remote sync.</Paragraph>
+                                                        <TextButton variant="danger" onClick={() => void removePresenceLabSession(currentUserId, session.id)}>Remove</TextButton>
+                                                    </div>
+                                                </Card>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </Card>
                 </div>
 
                 <div className={cl("dashboard-side")}>
@@ -672,7 +752,7 @@ function PresenceLabTab() {
                             <Heading className={cl("panel-title")} tag="h4">Operators</Heading>
                             <Paragraph className={cl("section-copy")}>Add your own local test accounts and keep their profile snapshots here.</Paragraph>
                         </div>
-                        <Button variant="secondary" size="small" onClick={() => void addCurrentOperator()}>
+                        <Button className={cl("section-action-button")} variant="secondary" size="small" onClick={() => void addCurrentOperator()}>
                             Add Current Account
                         </Button>
                     </div>
@@ -694,7 +774,7 @@ function PresenceLabTab() {
                     </label>
 
                     <div className={cl("inline-actions")}>
-                        <Button variant="secondary" size="small" onClick={() => void addOperator()}>
+                        <Button className={cl("primary-action-button")} variant="secondary" size="small" onClick={() => void addOperator()}>
                             Save Operator
                         </Button>
                     </div>
@@ -747,7 +827,7 @@ function PresenceLabTab() {
                     </label>
 
                     <div className={cl("inline-actions")}>
-                        <Button variant="secondary" size="small" onClick={() => void addTarget()}>
+                        <Button className={cl("primary-action-button")} variant="secondary" size="small" onClick={() => void addTarget()}>
                             Save Target
                         </Button>
                     </div>
@@ -829,93 +909,13 @@ function PresenceLabTab() {
                 </label>
 
                 <div className={cl("inline-actions")}>
-                    <Button variant="secondary" size="small" onClick={() => void saveSession()}>
+                    <Button className={cl("primary-action-button")} variant="secondary" size="small" onClick={() => void saveSession()}>
                         Save Session
                     </Button>
                 </div>
             </Card>
             </div>
             </div>
-
-            <Card className={cl("panel-card", "history-card")} defaultPadding>
-                <div className={cl("section-head")}>
-                    <div>
-                        <Heading className={cl("panel-title")} tag="h4">Activity History</Heading>
-                        <Paragraph className={cl("section-copy")}>A clean local record of the sessions you log inside Presence Lab.</Paragraph>
-                    </div>
-                    <div className={cl("section-chip")}>{data.sessions.length} total</div>
-                </div>
-
-                <div className={cl("history-toolbar")}>
-                    <label className={cl("search-shell")}>
-                        <MagnifyingGlassIcon className={cl("search-icon")} width={16} height={16} />
-                        <input className={cl("search-input")} type="text" value={historyQuery} placeholder="Search operators, targets, servers, channels, or notes" onChange={event => setHistoryQuery(event.currentTarget.value)} />
-                    </label>
-                </div>
-
-                {pending && (
-                    <Card className={cl("empty-card")}>
-                        <LogIcon className={cl("empty-icon")} />
-                        <HeadingTertiary>Loading Presence Lab...</HeadingTertiary>
-                    </Card>
-                )}
-
-                {!pending && filteredGroups.length === 0 && (
-                    <Card className={cl("empty-card")}>
-                        <Microphone className={cl("empty-icon")} />
-                        <HeadingTertiary>No local sessions yet</HeadingTertiary>
-                        <Paragraph>Save a manual or simulated session and it will start building the dashboard instantly.</Paragraph>
-                    </Card>
-                )}
-
-                {!pending && filteredGroups.length > 0 && (
-                    <div className={cl("session-groups")}>
-                        {filteredGroups.map(group => (
-                            <div key={group.key} className={cl("session-group")}>
-                                <div className={cl("session-group-header")}>
-                                    <HeadingTertiary className={Margins.reset}>{group.label}</HeadingTertiary>
-                                    <span className={cl("session-group-count")}>
-                                        {group.sessions.length} entr{group.sessions.length === 1 ? "y" : "ies"}
-                                    </span>
-                                </div>
-
-                                <div className={cl("session-list")}>
-                                    {group.sessions.map(session => (
-                                        <Card key={session.id} className={cl("session-entry")}>
-                                            <div className={cl("session-entry-top")}>
-                                                <div className={cl("session-entry-route")}>
-                                                    <img className={cl("session-avatar")} src={session.operatorAvatarUrl} alt="" />
-                                                    <span className={cl("session-arrow")}>-&gt;</span>
-                                                    <img className={cl("session-avatar")} src={session.targetAvatarUrl} alt="" />
-                                                    <div>
-                                                        <Paragraph className={cl("session-title")}>{session.operatorLabel} -&gt; {session.targetLabel}</Paragraph>
-                                                        <Paragraph className={cl("session-context")}>{getGuildLabel(session.guildName, session.channelName)}</Paragraph>
-                                                    </div>
-                                                </div>
-
-                                                <div className={cl("session-entry-meta")}>
-                                                    <span className={cl("session-badge")}>{session.outcome === "manual" ? "Manual" : "Simulated"}</span>
-                                                    <span className={cl("session-time")}>{formatDateTime(session.startedAt)}</span>
-                                                </div>
-                                            </div>
-
-                                            <div className={cl("session-entry-body")}>
-                                                <div className={cl("session-duration-chip")}>{formatDurationMinutes(session.durationMinutes)}</div>
-                                                <Paragraph className={cl("session-notes")}>{session.notes || "No extra notes for this session."}</Paragraph>
-                                            </div>
-
-                                            <div className={cl("session-entry-footer")}>
-                                                <Paragraph className={cl("session-footnote")}>Logged locally by {BRAND_NAME}. No remote sync.</Paragraph>
-                                                <TextButton variant="danger" onClick={() => void removePresenceLabSession(currentUserId, session.id)}>Remove</TextButton>
-                                            </div>
-                                        </Card>
-                                    ))}
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                )}
-            </Card>
             </div>
         </SettingsTab>
     );
