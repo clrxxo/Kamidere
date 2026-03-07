@@ -10,12 +10,12 @@ import { Card } from "@components/Card";
 import { Heading } from "@components/Heading";
 import { Paragraph } from "@components/Paragraph";
 import { PluginCard } from "@components/settings/tabs/plugins/PluginCard";
+import { BRAND_NAME } from "@shared/branding";
 import { ChangeList } from "@utils/ChangeList";
 import { classNameFactory } from "@utils/css";
 import { Margins } from "@utils/margins";
 import { useForceUpdater } from "@utils/react";
 import { React, Tooltip } from "@webpack/common";
-import { BRAND_NAME } from "@shared/branding";
 
 import Plugins from "~plugins";
 

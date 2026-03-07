@@ -27,8 +27,7 @@ import { classNameFactory } from "@utils/css";
 import { Margins } from "@utils/margins";
 import { identity } from "@utils/misc";
 import { relaunch } from "@utils/native";
-import { SettingsRouter } from "@webpack/common";
-import { React, Select } from "@webpack/common";
+import { React, Select, SettingsRouter } from "@webpack/common";
 
 import { openNotificationSettingsModal } from "./NotificationSettings";
 
@@ -37,7 +36,7 @@ const cl = classNameFactory("vc-vencord-tab-");
 const HERO_BACKGROUND = `data:image/svg+xml;utf8,${encodeURIComponent(
     [
         '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 600">',
-        '<defs>',
+        "<defs>",
         '<linearGradient id="g" x1="0" y1="0" x2="1" y2="1">',
         '<stop stop-color="#1B0A0F"/>',
         '<stop offset="0.55" stop-color="#6F1A2D"/>',

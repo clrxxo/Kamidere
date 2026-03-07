@@ -30,8 +30,8 @@ export { PlainSettings, Settings };
 
 import { coreStyleRootNode, initStyles } from "@api/Styles";
 import { openSettingsTabModal, UpdaterTab } from "@components/settings";
-import { debounce } from "@shared/debounce";
 import { BRAND_NAME } from "@shared/branding";
+import { debounce } from "@shared/debounce";
 import { IS_WINDOWS } from "@utils/constants";
 import { createAndAppendStyle } from "@utils/css";
 import { StartAt } from "@utils/types";

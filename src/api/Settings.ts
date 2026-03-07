@@ -16,8 +16,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { SettingsStore as SettingsStoreClass } from "@shared/SettingsStore";
 import { DEFAULT_CLOUD_BACKEND } from "@shared/branding";
+import { SettingsStore as SettingsStoreClass } from "@shared/SettingsStore";
 import { Logger } from "@utils/Logger";
 import { mergeDefaults } from "@utils/mergeDefaults";
 import { DefinedSettings, OptionType, SettingsChecks, SettingsDefinition } from "@utils/types";

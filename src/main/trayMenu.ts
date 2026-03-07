@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-import { IpcEvents } from "@shared/IpcEvents";
 import { BRAND_ICON_DATA_URL, BRAND_NAME, BRAND_TAGLINE_SHORT } from "@shared/branding";
+import { IpcEvents } from "@shared/IpcEvents";
 import { gitHashShort } from "@shared/vencordUserAgent";
 import { BrowserWindow, ipcMain, Menu, MenuItemConstructorOptions, shell } from "electron";
 import aboutHtml from "file://about.html?minify";

@@ -16,11 +16,11 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+import { BRAND_NAME } from "@shared/branding";
 import { Logger } from "@utils/Logger";
 import { makeCodeblock } from "@utils/text";
 import { CommandArgument, CommandContext, CommandOption } from "@vencord/discord-types";
 
-import { BRAND_NAME } from "@shared/branding";
 import { sendBotMessage } from "./commandHelpers";
 import { ApplicationCommandInputType, ApplicationCommandOptionType, ApplicationCommandType, VencordCommand } from "./types";
 

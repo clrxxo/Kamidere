@@ -28,8 +28,8 @@ import ErrorBoundary from "@components/ErrorBoundary";
 import { HeadingTertiary } from "@components/Heading";
 import { Paragraph } from "@components/Paragraph";
 import { SettingsTab } from "@components/settings";
-import { debounce } from "@shared/debounce";
 import { BRAND_NAME } from "@shared/branding";
+import { debounce } from "@shared/debounce";
 import { ChangeList } from "@utils/ChangeList";
 import { classNameFactory } from "@utils/css";
 import { isTruthy } from "@utils/guards";
@@ -44,8 +44,8 @@ import Plugins, { ExcludedPlugins, PluginMeta } from "~plugins";
 
 import { PluginCard } from "./PluginCard";
 import { openWarningModal } from "./PluginModal";
-import { StockPluginsCard, UserPluginsCard } from "./PluginStatCards";
 import { getPluginSourceId } from "./pluginSource";
+import { StockPluginsCard, UserPluginsCard } from "./PluginStatCards";
 import { UIElementsButton } from "./UIElements";
 
 export const cl = classNameFactory("vc-plugins-");

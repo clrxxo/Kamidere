@@ -20,7 +20,7 @@ export const BRAND_SUPPORT_URL = `${BRAND_REPOSITORY_URL}/issues`;
 
 const brandIconSvg = [
     '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">',
-    '<defs>',
+    "<defs>",
     '<linearGradient id="bg" x1="14" y1="12" x2="112" y2="116" gradientUnits="userSpaceOnUse">',
     '<stop stop-color="#14090D"/>',
     '<stop offset="0.55" stop-color="#45111B"/>',
