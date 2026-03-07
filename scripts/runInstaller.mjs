@@ -25,7 +25,7 @@ import { Readable } from "stream";
 import { finished } from "stream/promises";
 import { fileURLToPath } from "url";
 
-const BASE_URL = process.env.KAMIDERE_INSTALLER_BASE_URL || "https://github.com/Equicord/Equilotl/releases/latest/download/";
+const BASE_URL = process.env.KAMIDERE_INSTALLER_BASE_URL || "https://github.com/clrxxo/KamidereInstaller/releases/latest/download/";
 const INSTALLER_PATH_DARWIN = process.env.KAMIDERE_INSTALLER_PATH_DARWIN || "KamidereInstaller.app/Contents/MacOS/KamidereInstaller";
 const INSTALLER_APP_DARWIN = process.env.KAMIDERE_INSTALLER_APP_DARWIN || "KamidereInstaller.app";
 

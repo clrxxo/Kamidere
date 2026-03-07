@@ -448,8 +448,8 @@ export default definePlugin({
                         <Paragraph>You are using an externally updated {BRAND_NAME} build. The ability to help you here may be limited.</Paragraph>
                         <Paragraph className={Margins.top8}>
                             {BRAND_SUPPORT_URL
-                                ? <>Please join the <Link href={BRAND_SUPPORT_URL}>{BRAND_NAME} support server</Link>, or if this issue persists on Vencord, continue on.</>
-                                : <>Please use the official support server for your {BRAND_NAME} build, or if this issue persists on Vencord, continue on.</>
+                                ? <>Please use the <Link href={BRAND_SUPPORT_URL}>{BRAND_NAME} support page</Link>, or if this issue persists on Vencord, continue on.</>
+                                : <>Please use the official support page for your {BRAND_NAME} build, or if this issue persists on Vencord, continue on.</>
                             }
                         </Paragraph>
                     </div>

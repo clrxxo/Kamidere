@@ -9,12 +9,14 @@ export const BRAND_NAME_LOWER = "kamidere";
 export const BRAND_TAGLINE = "A commanding Discord client mod with a sharp plugin stack.";
 export const BRAND_TAGLINE_SHORT = "Sharp client mod. Large plugin stack.";
 export const DEFAULT_CLOUD_BACKEND = "https://api.vencord.dev/";
+export const BRAND_REPOSITORY_URL = "https://github.com/clrxxo/Kamidere";
+export const BRAND_INSTALLER_REPOSITORY_URL = "https://github.com/clrxxo/KamidereInstaller";
 export const BRAND_DONATE_URL = "https://github.com/sponsors/thororen1234";
 export const UPSTREAM_DONATE_URL = "https://github.com/sponsors/Vendicated";
-export const BRAND_TRANSLATE_URL = "https://weblate.equicord.org/projects/equicord/";
+export const BRAND_TRANSLATE_URL = BRAND_REPOSITORY_URL;
 export const BRAND_BADGES_URL = "https://badge.equicord.org/badges.json";
 export const BRAND_DONOR_BADGE_PREVIEW_URL = "https://badge.equicord.org/donor.webp";
-export const BRAND_SUPPORT_URL = "";
+export const BRAND_SUPPORT_URL = `${BRAND_REPOSITORY_URL}/issues`;
 
 const brandIconSvg = [
     '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">',

@@ -1,11 +1,11 @@
 #!/bin/bash
 
 # Configuration
-INSTALLER_PATH="$HOME/.equilotl"
-GITHUB_URL="https://github.com/Equicord/Equilotl/releases/latest/download/EquilotlCli-Linux"
+INSTALLER_PATH="$HOME/.kamidere-installer"
+GITHUB_URL="${KAMIDERE_INSTALLER_URL:-https://github.com/clrxxo/KamidereInstaller/releases/latest/download/KamidereCli-linux}"
 PRIVILEGE_CMDS=("sudo" "doas")
 DEBUG=false
-LOG_FILE="$(dirname "$(realpath "$0")")/equicordinstalldebug.log"
+LOG_FILE="$(dirname "$(realpath "$0")")/kamidereinstalldebug.log"
 
 # Colors for output
 RED='\033[0;31m'
@@ -38,7 +38,7 @@ check_root() {
 
 # Download the installer
 download_installer() {
-    echo -e "${YELLOW}Downloading installer...${NC}"
+    echo -e "${YELLOW}Downloading Kamidere installer...${NC}"
     if ! curl -sSL "$GITHUB_URL" --output "$INSTALLER_PATH"; then
         error "Failed to download installer from GitHub"
     fi
@@ -113,11 +113,7 @@ main() {
     fi
 
     debug_log "Installation completed successfully"
-    echo -e "\n${GREEN}Installation completed successfully!${NC}"
-    echo -e "\nCredits:"
-    echo "Original script forked from Vencord"
-    echo "Modified by PhoenixAceVFX for Equicord Updater"
-    echo "Rewrite by PhoenixAceVFX"
+    echo -e "\n${GREEN}Kamidere installation completed successfully!${NC}"
 }
 
 # Pass arguments to main
