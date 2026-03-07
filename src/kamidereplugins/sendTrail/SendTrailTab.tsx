@@ -382,6 +382,19 @@ function SendTrailConfigModal({
     );
     const [manualProtectedDmUserId, setManualProtectedDmUserId] = React.useState("");
     const requestedDmUsersRef = React.useRef<Set<string>>(new Set());
+    const applyProtectedUserInputStyles = React.useCallback((node: HTMLInputElement | null) => {
+        if (!node) return;
+
+        const apply = () => {
+            node.style.setProperty("color", "var(--text-normal)", "important");
+            node.style.setProperty("-webkit-text-fill-color", "var(--text-normal)", "important");
+            node.style.setProperty("caret-color", "var(--text-normal)", "important");
+            node.style.setProperty("background-color", "transparent", "important");
+        };
+
+        apply();
+        window.requestAnimationFrame(apply);
+    }, []);
 
     const purgeTargetOptions: SelectOption<SendTrailPurgeTarget>[] = [
         { label: "Everything", value: "all" },
@@ -557,6 +570,8 @@ function SendTrailConfigModal({
                             value={manualProtectedDmUserId}
                             placeholder="Add a friend by user ID"
                             onChange={setManualProtectedDmUserId}
+                            inputRef={applyProtectedUserInputStyles}
+                            onFocus={() => applyProtectedUserInputStyles(document.activeElement as HTMLInputElement | null)}
                             onKeyDown={event => {
                                 if (event.key !== "Enter") return;
                                 event.preventDefault();
