@@ -12,6 +12,7 @@ import { SpecialCard } from "@components/settings/SpecialCard";
 import { Switch } from "@components/Switch";
 import { BRAND_ICON_DATA_URL, BRAND_NAME } from "@shared/branding";
 import { classNameFactory } from "@utils/css";
+import { fetchUserProfile } from "@utils/discord";
 import { Margins } from "@utils/margins";
 import { closeModal, ModalCloseButton, ModalContent, ModalFooter, ModalHeader, ModalProps, ModalRoot, ModalSize, openModal } from "@utils/modal";
 import { sleep } from "@utils/misc";
@@ -355,9 +356,24 @@ function SendTrailConfigModal({
     const config = settings.use(["purgeTarget", "protectAllDms", "protectedDmChannels", "protectedDmUserIds"]);
     const protectedDmChannels = React.useMemo(() => parseProtectedDmChannels(config.protectedDmChannels), [config.protectedDmChannels]);
     const protectedDmUserIds = React.useMemo(() => parseProtectedDmUserIds(config.protectedDmUserIds), [config.protectedDmUserIds]);
+    const dmUserIds = React.useMemo(() =>
+        Array.from(new Set([
+            ...protectedDmUserIds,
+            ...records
+                .filter(isDirectMessageRecord)
+                .flatMap(record => getRecordRecipientIds(record)),
+        ])).sort(),
+    [protectedDmUserIds, records]);
+    const userStoreSnapshot = useStateFromStores([UserStore], () =>
+        dmUserIds.map(id => {
+            const user = UserStore.getUser(id) as { username?: string; globalName?: string; global_name?: string; avatar?: string | null; } | undefined;
+            return `${id}:${user?.username ?? ""}:${user?.globalName ?? user?.global_name ?? ""}:${user?.avatar ?? ""}`;
+        }).join("|"),
+    [dmUserIds]);
     const dmConversations = React.useMemo(() => buildDmConversations(records), [records]);
-    const dmUserContacts = React.useMemo(() => buildDmUserContacts(records, protectedDmUserIds), [protectedDmUserIds, records]);
+    const dmUserContacts = React.useMemo(() => buildDmUserContacts(records, protectedDmUserIds), [protectedDmUserIds, records, userStoreSnapshot]);
     const [manualProtectedDmUserId, setManualProtectedDmUserId] = React.useState("");
+    const requestedDmUsersRef = React.useRef<Set<string>>(new Set());
 
     const purgeTargetOptions: SelectOption<SendTrailPurgeTarget>[] = [
         { label: "Everything", value: "all" },
@@ -406,6 +422,16 @@ function SendTrailConfigModal({
         setManualProtectedDmUserId("");
         showToast("Saved permanent DM protection for that user ID.", Toasts.Type.SUCCESS);
     }, [manualProtectedDmUserId, protectedDmUserIds, updateProtectedDmUserIds]);
+
+    React.useEffect(() => {
+        for (const userId of dmUserIds) {
+            const user = UserStore.getUser(userId) as { username?: string; } | undefined;
+            if (user?.username || requestedDmUsersRef.current.has(userId)) continue;
+
+            requestedDmUsersRef.current.add(userId);
+            void fetchUserProfile(userId).catch(() => null);
+        }
+    }, [dmUserIds, userStoreSnapshot]);
 
     return (
         <ModalRoot {...modalProps} size={ModalSize.MEDIUM}>
@@ -496,6 +522,9 @@ function SendTrailConfigModal({
                                 className={cl("config-id-input")}
                                 type="text"
                                 inputMode="numeric"
+                                autoComplete="off"
+                                autoCorrect="off"
+                                autoCapitalize="off"
                                 value={manualProtectedDmUserId}
                                 placeholder="Add a friend by user ID"
                                 onChange={event => setManualProtectedDmUserId(event.currentTarget.value)}
@@ -1243,6 +1272,7 @@ function SendTrailTab() {
                         <input
                             className={cl("search-input")}
                             type="text"
+                            autoComplete="off"
                             value={query}
                             placeholder="Search messages, channels, servers, or media"
                             onChange={event => setQuery(event.currentTarget.value)}

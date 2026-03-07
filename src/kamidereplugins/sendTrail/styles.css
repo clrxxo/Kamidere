@@ -249,9 +249,9 @@
 }
 
 .vc-send-trail-action-button-purge {
-    min-width: 134px;
+    min-width: 124px;
     min-height: 36px;
-    padding-inline: 12px;
+    padding-inline: 10px;
     justify-content: center;
     box-shadow: 0 10px 22px rgb(237 66 69 / 18%), inset 0 1px 0 rgb(255 255 255 / 6%);
 }
@@ -360,9 +360,9 @@
     padding: 0;
     border: 0;
     background: transparent;
-    color: var(--text-normal);
-    -webkit-text-fill-color: var(--text-normal);
-    caret-color: var(--text-normal);
+    color: var(--text-normal) !important;
+    -webkit-text-fill-color: var(--text-normal) !important;
+    caret-color: var(--text-normal) !important;
     font: inherit;
     line-height: 1.4;
 }
@@ -403,20 +403,21 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 6px;
+    gap: 8px;
     margin-top: 12px;
 }
 
 .vc-send-trail-history-search-shell {
-    flex: 1 1 420px;
-    max-width: 520px;
+    flex: 1 1 auto;
+    min-width: 280px;
+    max-width: none;
     min-height: 44px;
 }
 
 .vc-send-trail-history-actions-buttons {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 4px;
     flex: 0 0 auto;
 }
 
@@ -939,15 +940,26 @@
     padding: 0;
     border: 0;
     background: transparent;
-    color: var(--text-normal);
-    -webkit-text-fill-color: var(--text-normal);
-    caret-color: var(--text-normal);
+    color: var(--text-normal) !important;
+    -webkit-text-fill-color: var(--text-normal) !important;
+    caret-color: var(--text-normal) !important;
     font: inherit;
     outline: none;
 }
 
 .vc-send-trail-config-id-input::placeholder {
     color: var(--text-muted);
+}
+
+.vc-send-trail-search-input:-webkit-autofill,
+.vc-send-trail-search-input:-webkit-autofill:hover,
+.vc-send-trail-search-input:-webkit-autofill:focus,
+.vc-send-trail-config-id-input:-webkit-autofill,
+.vc-send-trail-config-id-input:-webkit-autofill:hover,
+.vc-send-trail-config-id-input:-webkit-autofill:focus {
+    -webkit-text-fill-color: var(--text-normal) !important;
+    caret-color: var(--text-normal) !important;
+    transition: background-color 99999s ease-in-out 0s;
 }
 
 .vc-send-trail-config-save-button {
