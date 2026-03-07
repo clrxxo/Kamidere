@@ -32,7 +32,7 @@ import { proxyLazy } from "@utils/lazy";
 import { Margins } from "@utils/margins";
 import { classes, isObjectEmpty } from "@utils/misc";
 import { ModalContent, ModalFooter, ModalHeader, ModalProps, ModalRoot, ModalSize, openModal } from "@utils/modal";
-import { OptionType, Plugin } from "@utils/types";
+import { OptionType, Plugin, PluginAuthor } from "@utils/types";
 import { User } from "@vencord/discord-types";
 import { findComponentByCodeLazy, findCssClassesLazy } from "@webpack";
 import { Clickable, FluxDispatcher, React, Toasts, Tooltip, useEffect, useMemo, UserStore, UserSummaryItem, UserUtils, useState } from "@webpack/common";
@@ -58,6 +58,15 @@ interface PluginModalProps extends ModalProps {
     onRestartNeeded(key: string): void;
 }
 
+interface ResolvedPluginAuthor {
+    author: PluginAuthor;
+    user: Partial<User>;
+    avatarUrl?: string;
+    githubUrl?: string;
+    websiteUrl?: string;
+    canOpenContributorModal: boolean;
+}
+
 export function makeDummyUser(user: { username: string; id?: string; avatar?: string; }) {
     const newUser = new UserRecord({
         username: user.username,
@@ -75,30 +84,88 @@ export function makeDummyUser(user: { username: string; id?: string; avatar?: st
     return newUser;
 }
 
+function getAuthorGithubUrl(author: PluginAuthor) {
+    if (!author.github) return void 0;
+    return /^https?:\/\//.test(author.github) ? author.github : `https://github.com/${author.github}`;
+}
+
+function getAuthorWebsiteUrl(author: PluginAuthor) {
+    if (!author.website) return void 0;
+    return /^https?:\/\//.test(author.website) ? author.website : `https://${author.website}`;
+}
+
 export default function PluginModal({ plugin, onRestartNeeded, onClose, transitionState }: PluginModalProps) {
     const pluginSettings = useSettings([`plugins.${plugin.name}.*`]).plugins[plugin.name];
     const hasSettings = Boolean(pluginSettings && plugin.options && !isObjectEmpty(plugin.options));
 
     // avoid layout shift by showing dummy users while loading users
-    const fallbackAuthors = useMemo(() => [makeDummyUser({ username: "Loading...", id: "-1465912127305809920" })], []);
-    const [authors, setAuthors] = useState<Partial<User>[]>([]);
+    const fallbackAuthors = useMemo<ResolvedPluginAuthor[]>(() => [{
+        author: { name: "Loading...", id: 0n },
+        user: makeDummyUser({ username: "Loading...", id: "-1465912127305809920" }),
+        canOpenContributorModal: false,
+    }], []);
+    const [authors, setAuthors] = useState<ResolvedPluginAuthor[]>([]);
 
     useEffect(() => {
-        (async () => {
-            for (const [index, user] of plugin.authors.slice(0, 6).entries()) {
-                try {
-                    const author = user.id
-                        ? await UserUtils.getUser(String(user.id))
-                            .catch(() => makeDummyUser({ username: user.name }))
-                        : makeDummyUser({ username: user.name });
+        let cancelled = false;
+        setAuthors([]);
 
-                    setAuthors(a => [...a, author]);
-                } catch (e) {
-                    continue;
+        void (async () => {
+            const resolvedAuthors = await Promise.all(plugin.authors.slice(0, 6).map(async (author, index) => {
+                try {
+                    const resolvedUser = author.id
+                        ? await UserUtils.getUser(String(author.id)).catch(() => null)
+                        : null;
+
+                    return {
+                        author,
+                        user: resolvedUser ?? makeDummyUser({
+                            username: author.name,
+                            id: `plugin-author:${plugin.name}:${index}`,
+                        }),
+                        avatarUrl: author.avatarUrl,
+                        githubUrl: getAuthorGithubUrl(author),
+                        websiteUrl: getAuthorWebsiteUrl(author),
+                        canOpenContributorModal: !!resolvedUser,
+                    } satisfies ResolvedPluginAuthor;
+                } catch {
+                    return {
+                        author,
+                        user: makeDummyUser({
+                            username: author.name,
+                            id: `plugin-author:${plugin.name}:${index}`,
+                        }),
+                        avatarUrl: author.avatarUrl,
+                        githubUrl: getAuthorGithubUrl(author),
+                        websiteUrl: getAuthorWebsiteUrl(author),
+                        canOpenContributorModal: false,
+                    } satisfies ResolvedPluginAuthor;
                 }
+            }));
+
+            if (!cancelled) {
+                setAuthors(resolvedAuthors);
             }
         })();
-    }, [plugin.authors]);
+
+        return () => {
+            cancelled = true;
+        };
+    }, [plugin.authors, plugin.name]);
+
+    const displayedAuthors = authors.length ? authors : fallbackAuthors;
+    const displayedAuthorUsers = useMemo(() => displayedAuthors.map(author => author.user), [displayedAuthors]);
+    const displayedAuthorsById = useMemo(() => {
+        const next = new Map<string, ResolvedPluginAuthor>();
+
+        for (const author of displayedAuthors) {
+            if (author.user.id) {
+                next.set(String(author.user.id), author);
+            }
+        }
+
+        return next;
+    }, [displayedAuthors]);
 
     function handleResetClick() {
         openWarningModal(plugin, onRestartNeeded);
@@ -188,23 +255,56 @@ export default function PluginModal({ plugin, onRestartNeeded, onClose, transiti
                     <div style={{ width: "fit-content" }}>
                         <ErrorBoundary noop>
                             <UserSummaryItem
-                                users={authors.length ? authors : fallbackAuthors}
+                                users={displayedAuthorUsers}
                                 guildId={undefined}
                                 renderIcon={false}
                                 showDefaultAvatarsForNullUsers
                                 renderMoreUsers={renderMoreUsers}
                                 renderUser={(user: User) => (
-                                    <Clickable
-                                        className={AvatarStyles.clickableAvatar}
-                                        onClick={() => openContributorModal(user)}
-                                    >
-                                        <img
-                                            className={AvatarStyles.avatar}
-                                            src={user.getAvatarURL(void 0, 80, true)}
-                                            alt={user.username}
-                                            title={user.username}
-                                        />
-                                    </Clickable>
+                                    (() => {
+                                        const resolvedAuthor = displayedAuthorsById.get(String(user.id));
+                                        const avatarUrl = resolvedAuthor?.avatarUrl ?? user.getAvatarURL(void 0, 80, true);
+                                        const label = resolvedAuthor?.author.name ?? user.username;
+                                        const externalUrl = resolvedAuthor?.githubUrl ?? resolvedAuthor?.websiteUrl;
+                                        const avatar = (
+                                            <img
+                                                className={AvatarStyles.avatar}
+                                                src={avatarUrl}
+                                                alt={label}
+                                                title={label}
+                                            />
+                                        );
+
+                                        if (resolvedAuthor?.canOpenContributorModal) {
+                                            return (
+                                                <Clickable
+                                                    className={AvatarStyles.clickableAvatar}
+                                                    onClick={() => openContributorModal(user)}
+                                                >
+                                                    {avatar}
+                                                </Clickable>
+                                            );
+                                        }
+
+                                        if (externalUrl) {
+                                            return (
+                                                <a
+                                                    className={AvatarStyles.clickableAvatar}
+                                                    href={externalUrl}
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                >
+                                                    {avatar}
+                                                </a>
+                                            );
+                                        }
+
+                                        return (
+                                            <div className={AvatarStyles.clickableAvatar}>
+                                                {avatar}
+                                            </div>
+                                        );
+                                    })()
                                 )}
                             />
                         </ErrorBoundary>

@@ -90,7 +90,10 @@ export interface Patch {
 
 export interface PluginAuthor {
     name: string;
-    id: BigInt;
+    id: bigint;
+    github?: string;
+    avatarUrl?: string;
+    website?: string;
 }
 
 export interface Plugin extends PluginDef {

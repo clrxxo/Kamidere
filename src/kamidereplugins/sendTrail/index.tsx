@@ -15,6 +15,8 @@ import { buildJumpLink, collectMediaItems, getChannelRecipientIds, getMessageTim
 
 const DRAFT_TTL_MS = 20_000;
 const MIN_MATCH_SCORE = 4;
+const SEND_TRAIL_SETTINGS_KEY = "kamidere_send_trail";
+const SEND_TRAIL_SETTINGS_SECTION = "KamidereSendTrail";
 
 let draftCounter = 0;
 const pendingDrafts = new Map<string, PendingSendDraft>();
@@ -220,10 +222,28 @@ function scheduleEnrichment(channelId: string, messageId: string, guildId?: stri
     })();
 }
 
+function unregisterSendTrailSettingsTab() {
+    removeFromArray(SettingsPlugin.customEntries, entry => entry.key === SEND_TRAIL_SETTINGS_KEY);
+    removeFromArray(SettingsPlugin.settingsSectionMap, entry => entry[1] === SEND_TRAIL_SETTINGS_KEY);
+}
+
+function registerSendTrailSettingsTab() {
+    unregisterSendTrailSettingsTab();
+
+    SettingsPlugin.customEntries.push({
+        key: SEND_TRAIL_SETTINGS_KEY,
+        title: "Send Trail",
+        Component: SendTrailTab,
+        Icon: ClockIcon,
+    });
+
+    SettingsPlugin.settingsSectionMap.push([SEND_TRAIL_SETTINGS_SECTION, SEND_TRAIL_SETTINGS_KEY]);
+}
+
 export default definePlugin({
     name: "SendTrail",
     description: "Tracks your newly sent messages, lets you select them, and purges them in a dedicated Kamidere settings page.",
-    authors: [Devs.Megu],
+    authors: [Devs.clrxxo],
     dependencies: ["Settings", "MessageEventsAPI"],
     enabledByDefault: true,
     tags: ["kamidere", "chat", "utility"],
@@ -231,20 +251,12 @@ export default definePlugin({
     settings,
 
     start() {
-        SettingsPlugin.customEntries.push({
-            key: "kamidere_send_trail",
-            title: "Send Trail",
-            Component: SendTrailTab,
-            Icon: ClockIcon,
-        });
-
-        SettingsPlugin.settingsSectionMap.push(["KamidereSendTrail", "kamidere_send_trail"]);
+        registerSendTrailSettingsTab();
     },
 
     stop() {
         pendingDrafts.clear();
-        removeFromArray(SettingsPlugin.customEntries, entry => entry.key === "kamidere_send_trail");
-        removeFromArray(SettingsPlugin.settingsSectionMap, entry => entry[1] === "kamidere_send_trail");
+        unregisterSendTrailSettingsTab();
     },
 
     onBeforeMessageSend(channelId, messageObj, options) {

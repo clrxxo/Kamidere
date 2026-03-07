@@ -1041,6 +1041,7 @@ function SendTrailTab() {
 
     const dmConversationCount = React.useMemo(() => buildDmConversations(records).length, [records]);
     const isBusy = purgeStatus.phase === "running";
+    const shouldHideLoadingState = isBusy || deletingIds.size > 0 || renderedPurgeStatus.phase !== "idle";
     const scopeLabel = scopeOptions.find(option => option.value === scope)?.label ?? "All destinations";
     const kindLabel = kindOptions.find(option => option.value === kind)?.label ?? "Everything";
     const periodLabel = periodOptions.find(option => option.value === period)?.label ?? "All time";
@@ -1355,7 +1356,7 @@ function SendTrailTab() {
                 </div>
 
                 <div className={cl("history-list")}>
-                    {pending && (
+                    {pending && !shouldHideLoadingState && (
                         <Card className={cl("empty-card")} defaultPadding>
                             <LogIcon className={cl("empty-icon")} />
                             <HeadingTertiary>Loading Send Trail history...</HeadingTertiary>

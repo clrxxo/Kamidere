@@ -57,6 +57,9 @@ export interface Dev {
     name: string;
     id: bigint;
     badge?: boolean;
+    github?: string;
+    avatarUrl?: string;
+    website?: string;
 }
 
 /**
@@ -90,6 +93,13 @@ export const Devs = /* #__PURE__*/ Object.freeze({
     Megu: {
         name: "Megumin",
         id: 545581357812678656n
+    },
+    clrxxo: {
+        name: "clrxxo",
+        id: 0n,
+        badge: false,
+        github: "clrxxo",
+        avatarUrl: "https://avatars.githubusercontent.com/u/243032432?v=4",
     },
     botato: {
         name: "botato",
