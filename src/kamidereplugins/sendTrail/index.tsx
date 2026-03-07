@@ -11,7 +11,7 @@ import SendTrailTab from "./SendTrailTab";
 import { settings } from "./settings";
 import { appendSentTrailRecord, mergeSentTrailRecordMedia, removeSentTrailRecord } from "./store";
 import type { MessageCreatePayload, MessageDeletePayload, MessageUpdatePayload, PendingSendDraft, SentTrailRecord } from "./types";
-import { buildJumpLink, collectMediaItems, getMessageTimestamp, getRecordPreview, hasMediaLinks, makeAttachmentSignature, makeUploadSignature, normalizeContent } from "./utils";
+import { buildJumpLink, collectMediaItems, getChannelRecipientIds, getMessageTimestamp, getRecordPreview, hasMediaLinks, makeAttachmentSignature, makeUploadSignature, normalizeContent } from "./utils";
 
 const DRAFT_TTL_MS = 20_000;
 const MIN_MATCH_SCORE = 4;
@@ -142,6 +142,7 @@ function buildRecord(payload: MessageCreatePayload, draft: PendingSendDraft): Se
         media,
         channelNameSnapshot: channel?.name ?? undefined,
         guildNameSnapshot: guild?.name ?? undefined,
+        recipientUserIds: getChannelRecipientIds(channel),
         replyMessageId: message.messageReference?.message_id ?? draft.replyMessageId,
     };
 }
@@ -174,6 +175,7 @@ async function maybeEnrichRecord(payload: MessageUpdatePayload) {
             jumpLink: buildJumpLink(guildId, message.channel_id, message.id),
             channelNameSnapshot: channel?.name ?? undefined,
             guildNameSnapshot: guild?.name ?? undefined,
+            recipientUserIds: getChannelRecipientIds(channel),
         },
     );
 }
@@ -202,6 +204,7 @@ async function enrichFromStore(channelId: string, messageId: string, guildId?: s
             jumpLink: buildJumpLink(effectiveGuildId, channelId, messageId),
             channelNameSnapshot: channel?.name ?? undefined,
             guildNameSnapshot: guild?.name ?? undefined,
+            recipientUserIds: getChannelRecipientIds(channel),
         },
     );
 

@@ -21,6 +21,15 @@ export function parseProtectedDmChannels(value: string) {
     );
 }
 
+export function parseProtectedDmUserIds(value: string) {
+    return new Set(
+        value
+            .split(",")
+            .map(part => part.trim())
+            .filter(Boolean),
+    );
+}
+
 export const settings = definePluginSettings({
     purgeTarget: {
         type: OptionType.SELECT,
@@ -40,6 +49,13 @@ export const settings = definePluginSettings({
     protectedDmChannels: {
         type: OptionType.STRING,
         description: "Protected direct-message channel ids.",
+        default: "",
+        hidden: true,
+        onChange: normalizeCommaList,
+    },
+    protectedDmUserIds: {
+        type: OptionType.STRING,
+        description: "Protected direct-message user ids.",
         default: "",
         hidden: true,
         onChange: normalizeCommaList,

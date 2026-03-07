@@ -18,9 +18,9 @@ import { sleep } from "@utils/misc";
 import { Alerts, ChannelStore, MessageActions, NavigationRouter, React, Select, Toasts, UserStore, useStateFromStores } from "@webpack/common";
 
 import { clearSentTrailRecords, removeSentTrailRecord, useSentTrailRecords } from "./store";
-import { parseProtectedDmChannels, settings, SendTrailPurgeTarget } from "./settings";
+import { parseProtectedDmChannels, parseProtectedDmUserIds, settings, SendTrailPurgeTarget } from "./settings";
 import type { SentTrailMediaItem, SentTrailRecord } from "./types";
-import { buildSearchIndex, formatDayLabel, formatTime, getChannelRecipientIds, recordMatchesScope, resolveRecordContext } from "./utils";
+import { buildSearchIndex, formatDayLabel, formatTime, getRecordRecipientIds, recordMatchesScope, resolveRecordContext } from "./utils";
 
 const cl = classNameFactory("vc-send-trail-");
 const LIVE_DELETE_DELAY_MS = 850;
@@ -81,6 +81,13 @@ interface DmConversation {
     count: number;
 }
 
+interface DmUserContact {
+    userId: string;
+    label: string;
+    details: string;
+    count: number;
+}
+
 function showToast(message: string, type: any) {
     Toasts.show({
         message,
@@ -116,6 +123,7 @@ function isRecordProtected(
     purgeTarget: SendTrailPurgeTarget,
     protectAllDms: boolean,
     protectedDmChannels: Set<string>,
+    protectedDmUserIds: Set<string>,
 ) {
     const isDm = isDirectMessageRecord(record);
 
@@ -123,8 +131,32 @@ function isRecordProtected(
     if (purgeTarget === "servers" && isDm) return true;
     if (isDm && protectAllDms) return true;
     if (isDm && protectedDmChannels.has(record.channelId)) return true;
+    if (isDm && getRecordRecipientIds(record).some(id => protectedDmUserIds.has(id))) return true;
 
     return false;
+}
+
+function resolveRecipientIdentity(recipientId: string, channel: ReturnType<typeof ChannelStore.getChannel>) {
+    const user = UserStore.getUser(recipientId);
+    if (user) {
+        return {
+            label: user.globalName || user.username || recipientId,
+            details: user.globalName && user.username && user.globalName !== user.username
+                ? `@${user.username}`
+                : `User ID ${recipientId}`,
+        };
+    }
+
+    const rawRecipient = (channel as { rawRecipients?: Array<{ id?: string; username?: string; global_name?: string; }>; } | undefined)
+        ?.rawRecipients
+        ?.find(recipient => recipient?.id === recipientId);
+
+    return {
+        label: rawRecipient?.global_name || rawRecipient?.username || recipientId,
+        details: rawRecipient?.username && rawRecipient.username !== rawRecipient.global_name
+            ? `@${rawRecipient.username}`
+            : `User ID ${recipientId}`,
+    };
 }
 
 function buildDmConversations(records: SentTrailRecord[]) {
@@ -135,11 +167,9 @@ function buildDmConversations(records: SentTrailRecord[]) {
 
         const context = resolveRecordContext(record);
         const channel = ChannelStore.getChannel(record.channelId);
-        const recipientIds = getChannelRecipientIds(channel);
+        const recipientIds = getRecordRecipientIds(record);
         const recipientNames = recipientIds
-            .map(id => UserStore.getUser(id))
-            .filter(Boolean)
-            .map(user => user.globalName || user.username)
+            .map(id => resolveRecipientIdentity(id, channel).label)
             .filter(Boolean);
 
         const label = recipientNames[0] ?? context.channelName;
@@ -162,6 +192,54 @@ function buildDmConversations(records: SentTrailRecord[]) {
     }
 
     return Array.from(conversations.values()).sort((left, right) => left.label.localeCompare(right.label));
+}
+
+function buildDmUserContacts(records: SentTrailRecord[], protectedDmUserIds: Set<string>) {
+    const contacts = new Map<string, DmUserContact>();
+
+    for (const record of records) {
+        if (!isDirectMessageRecord(record)) continue;
+
+        const channel = ChannelStore.getChannel(record.channelId);
+
+        for (const recipientId of getRecordRecipientIds(record)) {
+            const identity = resolveRecipientIdentity(recipientId, channel);
+            const existing = contacts.get(recipientId);
+
+            if (existing) {
+                existing.count++;
+                if (existing.label === existing.userId && identity.label !== recipientId) {
+                    existing.label = identity.label;
+                }
+                if (existing.details === `User ID ${recipientId}` && identity.details !== existing.details) {
+                    existing.details = identity.details;
+                }
+                continue;
+            }
+
+            contacts.set(recipientId, {
+                userId: recipientId,
+                label: identity.label,
+                details: identity.details,
+                count: 1,
+            });
+        }
+    }
+
+    for (const userId of protectedDmUserIds) {
+        if (contacts.has(userId)) continue;
+
+        contacts.set(userId, {
+            userId,
+            label: userId,
+            details: "Manual user ID rule",
+            count: 0,
+        });
+    }
+
+    return Array.from(contacts.values()).sort((left, right) =>
+        left.label.localeCompare(right.label) || left.userId.localeCompare(right.userId),
+    );
 }
 
 function MediaPreview({ media }: { media: SentTrailMediaItem[]; }) {
@@ -259,9 +337,12 @@ function SendTrailConfigModal({
     close(): void;
     records: SentTrailRecord[];
 }) {
-    const config = settings.use(["purgeTarget", "protectAllDms", "protectedDmChannels"]);
+    const config = settings.use(["purgeTarget", "protectAllDms", "protectedDmChannels", "protectedDmUserIds"]);
     const protectedDmChannels = React.useMemo(() => parseProtectedDmChannels(config.protectedDmChannels), [config.protectedDmChannels]);
+    const protectedDmUserIds = React.useMemo(() => parseProtectedDmUserIds(config.protectedDmUserIds), [config.protectedDmUserIds]);
     const dmConversations = React.useMemo(() => buildDmConversations(records), [records]);
+    const dmUserContacts = React.useMemo(() => buildDmUserContacts(records, protectedDmUserIds), [protectedDmUserIds, records]);
+    const [manualProtectedDmUserId, setManualProtectedDmUserId] = React.useState("");
 
     const purgeTargetOptions: SelectOption<SendTrailPurgeTarget>[] = [
         { label: "Everything", value: "all" },
@@ -273,12 +354,43 @@ function SendTrailConfigModal({
         settings.store.protectedDmChannels = Array.from(next).sort().join(",");
     }, []);
 
+    const updateProtectedDmUserIds = React.useCallback((next: Set<string>) => {
+        settings.store.protectedDmUserIds = Array.from(next).sort().join(",");
+    }, []);
+
     const toggleProtectedDm = React.useCallback((channelId: string, enabled: boolean) => {
         const next = new Set(protectedDmChannels);
         if (enabled) next.add(channelId);
         else next.delete(channelId);
         updateProtectedDmChannels(next);
     }, [protectedDmChannels, updateProtectedDmChannels]);
+
+    const toggleProtectedDmUser = React.useCallback((userId: string, enabled: boolean) => {
+        const next = new Set(protectedDmUserIds);
+        if (enabled) next.add(userId);
+        else next.delete(userId);
+        updateProtectedDmUserIds(next);
+    }, [protectedDmUserIds, updateProtectedDmUserIds]);
+
+    const addProtectedDmUser = React.useCallback(() => {
+        const normalized = manualProtectedDmUserId.trim();
+
+        if (!/^\d{5,24}$/.test(normalized)) {
+            showToast("Enter a numeric Discord user ID to save a friend rule.", Toasts.Type.FAILURE);
+            return;
+        }
+
+        if (protectedDmUserIds.has(normalized)) {
+            showToast("That DM user ID is already protected.", Toasts.Type.FAILURE);
+            return;
+        }
+
+        const next = new Set(protectedDmUserIds);
+        next.add(normalized);
+        updateProtectedDmUserIds(next);
+        setManualProtectedDmUserId("");
+        showToast("Saved permanent DM protection for that user ID.", Toasts.Type.SUCCESS);
+    }, [manualProtectedDmUserId, protectedDmUserIds, updateProtectedDmUserIds]);
 
     return (
         <ModalRoot {...modalProps} size={ModalSize.MEDIUM}>
@@ -342,6 +454,78 @@ function SendTrailConfigModal({
                                 <Switch
                                     checked={protectedDmChannels.has(conversation.channelId)}
                                     onChange={value => toggleProtectedDm(conversation.channelId, value)}
+                                />
+                            </Card>
+                        ))}
+                    </div>
+                )}
+
+                <div className={cl("config-list-header")}>
+                    <BaseText size="md" weight="semibold">Always protected DM users</BaseText>
+                    {!!protectedDmUserIds.size && (
+                        <TextButton variant="secondary" onClick={() => settings.store.protectedDmUserIds = ""}>
+                            Clear protected user list
+                        </TextButton>
+                    )}
+                </div>
+
+                <Paragraph className={cl("config-hint")}>
+                    Save friends here by user ID and every DM that includes them stays protected from purge.
+                </Paragraph>
+
+                <div className={cl("config-manual-row")}>
+                    <div className={cl("config-field", "config-manual-field")}>
+                        <span className={cl("field-label")}>Discord User ID</span>
+                        <label className={cl("config-id-shell")}>
+                            <input
+                                className={cl("config-id-input")}
+                                type="text"
+                                inputMode="numeric"
+                                value={manualProtectedDmUserId}
+                                placeholder="Add a friend by user ID"
+                                onChange={event => setManualProtectedDmUserId(event.currentTarget.value)}
+                                onKeyDown={event => {
+                                    if (event.key !== "Enter") return;
+                                    event.preventDefault();
+                                    addProtectedDmUser();
+                                }}
+                                spellCheck={false}
+                            />
+                        </label>
+                    </div>
+
+                    <Button
+                        size="small"
+                        variant="secondary"
+                        className={cl("config-save-button")}
+                        onClick={addProtectedDmUser}
+                    >
+                        Save Friend
+                    </Button>
+                </div>
+
+                {dmUserContacts.length === 0 ? (
+                    <Card className={cl("config-empty")} defaultPadding>
+                        <Paragraph className={Margins.reset}>
+                            No DM users are known yet. You can still save a friend manually by Discord user ID above.
+                        </Paragraph>
+                    </Card>
+                ) : (
+                    <div className={cl("config-list")}>
+                        {dmUserContacts.map(contact => (
+                            <Card key={contact.userId} className={cl("config-item")} defaultPadding>
+                                <div className={cl("config-item-copy")}>
+                                    <BaseText size="md" weight="semibold">{contact.label}</BaseText>
+                                    <Paragraph className={cl("config-hint")}>
+                                        {contact.details} / User ID {contact.userId}
+                                        {contact.count
+                                            ? ` / ${contact.count} saved DM message${contact.count === 1 ? "" : "s"}`
+                                            : " / no DM history loaded yet"}
+                                    </Paragraph>
+                                </div>
+                                <Switch
+                                    checked={protectedDmUserIds.has(contact.userId)}
+                                    onChange={value => toggleProtectedDmUser(contact.userId, value)}
                                 />
                             </Card>
                         ))}
@@ -512,10 +696,14 @@ function getScrollContainer(node: HTMLElement | null): HTMLElement | Window {
 function SendTrailTab() {
     const currentUserId = useStateFromStores([UserStore], () => UserStore.getCurrentUser()?.id ?? null);
     const [records, pending] = useSentTrailRecords(currentUserId);
-    const purgeConfig = settings.use(["purgeTarget", "protectAllDms", "protectedDmChannels"]);
+    const purgeConfig = settings.use(["purgeTarget", "protectAllDms", "protectedDmChannels", "protectedDmUserIds"]);
     const protectedDmChannels = React.useMemo(
         () => parseProtectedDmChannels(purgeConfig.protectedDmChannels),
         [purgeConfig.protectedDmChannels],
+    );
+    const protectedDmUserIds = React.useMemo(
+        () => parseProtectedDmUserIds(purgeConfig.protectedDmUserIds),
+        [purgeConfig.protectedDmUserIds],
     );
     const purgeTarget = purgeConfig.purgeTarget as SendTrailPurgeTarget;
 
@@ -760,8 +948,8 @@ function SendTrailTab() {
         [filteredRecords, selectedRecords],
     );
     const purgeActionEligibleRecords = React.useMemo(
-        () => purgeActionRecords.filter(record => !isRecordProtected(record, purgeTarget, purgeConfig.protectAllDms, protectedDmChannels)),
-        [protectedDmChannels, purgeActionRecords, purgeConfig.protectAllDms, purgeTarget],
+        () => purgeActionRecords.filter(record => !isRecordProtected(record, purgeTarget, purgeConfig.protectAllDms, protectedDmChannels, protectedDmUserIds)),
+        [protectedDmChannels, protectedDmUserIds, purgeActionRecords, purgeConfig.protectAllDms, purgeTarget],
     );
 
     const dmConversationCount = React.useMemo(() => buildDmConversations(records).length, [records]);
@@ -811,7 +999,7 @@ function SendTrailTab() {
         }
 
         const eligibleRecords = targetRecords.filter(record =>
-            !isRecordProtected(record, purgeTarget, purgeConfig.protectAllDms, protectedDmChannels),
+            !isRecordProtected(record, purgeTarget, purgeConfig.protectAllDms, protectedDmChannels, protectedDmUserIds),
         );
         const skipped = targetRecords.length - eligibleRecords.length;
 
@@ -902,7 +1090,7 @@ function SendTrailTab() {
         } else {
             showToast("No selected messages could be purged from Discord.", Toasts.Type.FAILURE);
         }
-    }, [currentUserId, protectedDmChannels, purgeConfig.protectAllDms, purgeTarget, updateDeletingId]);
+    }, [currentUserId, protectedDmChannels, protectedDmUserIds, purgeConfig.protectAllDms, purgeTarget, updateDeletingId]);
 
     const confirmPurge = React.useCallback(() => {
         if (purgeActionRecords.length === 0) return;
@@ -1120,7 +1308,7 @@ function SendTrailTab() {
                                         record={record}
                                         selected={selectedIds.has(record.id)}
                                         deleting={deletingIds.has(record.id)}
-                                        protectedFromPurge={isRecordProtected(record, purgeTarget, purgeConfig.protectAllDms, protectedDmChannels)}
+                                        protectedFromPurge={isRecordProtected(record, purgeTarget, purgeConfig.protectAllDms, protectedDmChannels, protectedDmUserIds)}
                                         onToggleSelected={() => toggleRecordSelection(record.id)}
                                     />
                                 ))}

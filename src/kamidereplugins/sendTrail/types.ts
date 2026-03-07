@@ -28,6 +28,7 @@ export interface SentTrailRecord {
     media: SentTrailMediaItem[];
     channelNameSnapshot?: string;
     guildNameSnapshot?: string;
+    recipientUserIds?: string[];
     replyMessageId?: string;
 }
 

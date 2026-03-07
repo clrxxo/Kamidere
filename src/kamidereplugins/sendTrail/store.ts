@@ -53,7 +53,7 @@ export async function mergeSentTrailRecordMedia(
     channelId: string,
     messageId: string,
     media: SentTrailMediaItem[],
-    metadata?: Partial<Pick<SentTrailRecord, "guildId" | "jumpLink" | "channelNameSnapshot" | "guildNameSnapshot">>,
+    metadata?: Partial<Pick<SentTrailRecord, "guildId" | "jumpLink" | "channelNameSnapshot" | "guildNameSnapshot" | "recipientUserIds">>,
 ) {
     const userId = UserStore.getCurrentUser()?.id;
     if (!userId || media.length === 0) return;
@@ -89,6 +89,7 @@ export async function mergeSentTrailRecordMedia(
             jumpLink: metadata?.jumpLink ?? current.jumpLink,
             channelNameSnapshot: metadata?.channelNameSnapshot ?? current.channelNameSnapshot,
             guildNameSnapshot: metadata?.guildNameSnapshot ?? current.guildNameSnapshot,
+            recipientUserIds: metadata?.recipientUserIds ?? current.recipientUserIds,
         };
 
         if (
@@ -97,7 +98,8 @@ export async function mergeSentTrailRecordMedia(
             nextRecord.jumpLink !== current.jumpLink ||
             nextRecord.guildId !== current.guildId ||
             nextRecord.channelNameSnapshot !== current.channelNameSnapshot ||
-            nextRecord.guildNameSnapshot !== current.guildNameSnapshot
+            nextRecord.guildNameSnapshot !== current.guildNameSnapshot ||
+            (nextRecord.recipientUserIds?.join(",") ?? "") !== (current.recipientUserIds?.join(",") ?? "")
         ) {
             didChange = true;
         }

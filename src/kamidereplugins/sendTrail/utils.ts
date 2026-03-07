@@ -194,6 +194,14 @@ export function getChannelRecipientIds(channel: Channel | undefined) {
     return Array.from(recipientIds);
 }
 
+export function getRecordRecipientIds(record: SentTrailRecord) {
+    if (record.recipientUserIds?.length) {
+        return Array.from(new Set(record.recipientUserIds.filter(Boolean)));
+    }
+
+    return getChannelRecipientIds(ChannelStore.getChannel(record.channelId));
+}
+
 function getChannelDisplayName(channel: Channel | undefined) {
     if (!channel) return null;
 
