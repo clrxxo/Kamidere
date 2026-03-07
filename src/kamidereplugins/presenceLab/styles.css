@@ -1,13 +1,15 @@
 .vc-presence-lab-shell {
+    --presence-lab-shell-width: min(1360px, calc(100vw - 360px));
     position: relative;
     display: flex;
     flex-direction: column;
     gap: 18px;
-    width: min(1320px, calc(100% - 72px));
-    max-width: min(1320px, calc(100% - 72px));
+    width: var(--presence-lab-shell-width);
+    max-width: var(--presence-lab-shell-width);
     min-width: 0;
     box-sizing: border-box;
-    margin: 20px auto 0;
+    margin-top: 20px;
+    margin-inline: calc((100% - var(--presence-lab-shell-width)) / 2);
     isolation: isolate;
 }
 
