@@ -12,11 +12,10 @@ import { SpecialCard } from "@components/settings/SpecialCard";
 import { Switch } from "@components/Switch";
 import { BRAND_ICON_DATA_URL, BRAND_NAME } from "@shared/branding";
 import { classNameFactory } from "@utils/css";
-import { fetchUserProfile } from "@utils/discord";
 import { Margins } from "@utils/margins";
 import { closeModal, ModalCloseButton, ModalContent, ModalFooter, ModalHeader, ModalProps, ModalRoot, ModalSize, openModal } from "@utils/modal";
 import { sleep } from "@utils/misc";
-import { Alerts, ChannelStore, MessageActions, NavigationRouter, React, Select, Toasts, UserStore, useStateFromStores } from "@webpack/common";
+import { Alerts, ChannelStore, MessageActions, NavigationRouter, React, Select, Toasts, UserStore, UserUtils, useStateFromStores } from "@webpack/common";
 
 import { clearSentTrailRecords, removeSentTrailRecord, useSentTrailRecords } from "./store";
 import { parseProtectedDmChannels, parseProtectedDmUserIds, settings, SendTrailPurgeTarget } from "./settings";
@@ -143,21 +142,28 @@ function getDefaultAvatarUrl(userId: string) {
     return `https://cdn.discordapp.com/embed/avatars/${index}.png`;
 }
 
-function resolveRecipientIdentity(recipientId: string, channel: ReturnType<typeof ChannelStore.getChannel>) {
+function buildRecipientIdentityFromUser(
+    recipientId: string,
+    user: { avatar?: string | null; username?: string; globalName?: string; global_name?: string; },
+) {
+    const avatarHash = user.avatar;
+    const avatarUrl = avatarHash
+        ? `https://cdn.discordapp.com/avatars/${recipientId}/${avatarHash}.${avatarHash.startsWith("a_") ? "gif" : "png"}?size=80`
+        : getDefaultAvatarUrl(recipientId);
+
+    return {
+        label: user.globalName || user.global_name || user.username || recipientId,
+        details: (user.globalName || user.global_name) && user.username && (user.globalName || user.global_name) !== user.username
+            ? `@${user.username}`
+            : `User ID ${recipientId}`,
+        avatarUrl,
+    };
+}
+
+function resolveRecipientIdentity(recipientId: string, channel?: ReturnType<typeof ChannelStore.getChannel>) {
     const user = UserStore.getUser(recipientId) as { avatar?: string | null; username?: string; globalName?: string; global_name?: string; } | undefined;
     if (user) {
-        const avatarHash = user.avatar;
-        const avatarUrl = avatarHash
-            ? `https://cdn.discordapp.com/avatars/${recipientId}/${avatarHash}.${avatarHash.startsWith("a_") ? "gif" : "png"}?size=80`
-            : getDefaultAvatarUrl(recipientId);
-
-        return {
-            label: user.globalName || user.global_name || user.username || recipientId,
-            details: (user.globalName || user.global_name) && user.username && (user.globalName || user.global_name) !== user.username
-                ? `@${user.username}`
-                : `User ID ${recipientId}`,
-            avatarUrl,
-        };
+        return buildRecipientIdentityFromUser(recipientId, user);
     }
 
     const rawRecipient = (channel as { rawRecipients?: Array<{ id?: string; username?: string; global_name?: string; }>; } | undefined)
@@ -208,7 +214,11 @@ function buildDmConversations(records: SentTrailRecord[]) {
     return Array.from(conversations.values()).sort((left, right) => left.label.localeCompare(right.label));
 }
 
-function buildDmUserContacts(records: SentTrailRecord[], protectedDmUserIds: Set<string>) {
+function buildDmUserContacts(
+    records: SentTrailRecord[],
+    protectedDmUserIds: Set<string>,
+    resolvedDmUsers: Record<string, Pick<DmUserContact, "label" | "details" | "avatarUrl">> = {},
+) {
     const contacts = new Map<string, DmUserContact>();
 
     for (const record of records) {
@@ -217,7 +227,7 @@ function buildDmUserContacts(records: SentTrailRecord[], protectedDmUserIds: Set
         const channel = ChannelStore.getChannel(record.channelId);
 
         for (const recipientId of getRecordRecipientIds(record)) {
-            const identity = resolveRecipientIdentity(recipientId, channel);
+            const identity = resolvedDmUsers[recipientId] ?? resolveRecipientIdentity(recipientId, channel);
             const existing = contacts.get(recipientId);
 
             if (existing) {
@@ -246,10 +256,10 @@ function buildDmUserContacts(records: SentTrailRecord[], protectedDmUserIds: Set
 
         contacts.set(userId, {
             userId,
-            label: userId,
-            details: "Manual user ID rule",
+            label: resolvedDmUsers[userId]?.label ?? userId,
+            details: resolvedDmUsers[userId]?.details ?? "Manual user ID rule",
             count: 0,
-            avatarUrl: getDefaultAvatarUrl(userId),
+            avatarUrl: resolvedDmUsers[userId]?.avatarUrl ?? getDefaultAvatarUrl(userId),
         });
     }
 
@@ -364,14 +374,12 @@ function SendTrailConfigModal({
                 .flatMap(record => getRecordRecipientIds(record)),
         ])).sort(),
     [protectedDmUserIds, records]);
-    const userStoreSnapshot = useStateFromStores([UserStore], () =>
-        dmUserIds.map(id => {
-            const user = UserStore.getUser(id) as { username?: string; globalName?: string; global_name?: string; avatar?: string | null; } | undefined;
-            return `${id}:${user?.username ?? ""}:${user?.globalName ?? user?.global_name ?? ""}:${user?.avatar ?? ""}`;
-        }).join("|"),
-    [dmUserIds]);
     const dmConversations = React.useMemo(() => buildDmConversations(records), [records]);
-    const dmUserContacts = React.useMemo(() => buildDmUserContacts(records, protectedDmUserIds), [protectedDmUserIds, records, userStoreSnapshot]);
+    const [resolvedDmUsers, setResolvedDmUsers] = React.useState<Record<string, Pick<DmUserContact, "label" | "details" | "avatarUrl">>>({});
+    const dmUserContacts = React.useMemo(
+        () => buildDmUserContacts(records, protectedDmUserIds, resolvedDmUsers),
+        [protectedDmUserIds, records, resolvedDmUsers],
+    );
     const [manualProtectedDmUserId, setManualProtectedDmUserId] = React.useState("");
     const requestedDmUsersRef = React.useRef<Set<string>>(new Set());
 
@@ -424,14 +432,36 @@ function SendTrailConfigModal({
     }, [manualProtectedDmUserId, protectedDmUserIds, updateProtectedDmUserIds]);
 
     React.useEffect(() => {
+        let cancelled = false;
+
         for (const userId of dmUserIds) {
-            const user = UserStore.getUser(userId) as { username?: string; } | undefined;
-            if (user?.username || requestedDmUsersRef.current.has(userId)) continue;
+            const cachedUser = UserStore.getUser(userId) as { avatar?: string | null; username?: string; globalName?: string; global_name?: string; } | undefined;
+            if (cachedUser?.username) {
+                setResolvedDmUsers(current => current[userId]
+                    ? current
+                    : { ...current, [userId]: buildRecipientIdentityFromUser(userId, cachedUser) });
+                continue;
+            }
+
+            if (resolvedDmUsers[userId] || requestedDmUsersRef.current.has(userId)) continue;
 
             requestedDmUsersRef.current.add(userId);
-            void fetchUserProfile(userId).catch(() => null);
+            void UserUtils.getUser(userId)
+                .then((user: { avatar?: string | null; username?: string; globalName?: string; global_name?: string; } | null | undefined) => {
+                    if (!user || cancelled) return;
+
+                    setResolvedDmUsers(current => ({
+                        ...current,
+                        [userId]: buildRecipientIdentityFromUser(userId, user),
+                    }));
+                })
+                .catch(() => null);
         }
-    }, [dmUserIds, userStoreSnapshot]);
+
+        return () => {
+            cancelled = true;
+        };
+    }, [dmUserIds, resolvedDmUsers]);
 
     return (
         <ModalRoot {...modalProps} size={ModalSize.MEDIUM}>
@@ -527,6 +557,11 @@ function SendTrailConfigModal({
                                 autoCapitalize="off"
                                 value={manualProtectedDmUserId}
                                 placeholder="Add a friend by user ID"
+                                style={{
+                                    color: "var(--text-normal)",
+                                    WebkitTextFillColor: "var(--text-normal)",
+                                    caretColor: "var(--text-normal)",
+                                }}
                                 onChange={event => setManualProtectedDmUserId(event.currentTarget.value)}
                                 onKeyDown={event => {
                                     if (event.key !== "Enter") return;
