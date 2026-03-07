@@ -1,5 +1,5 @@
 .vc-presence-lab-shell {
-    --presence-lab-shell-width: min(1360px, calc(100vw - 360px));
+    --presence-lab-shell-width: min(1180px, calc(100vw - 260px), calc(100% + 180px));
     position: relative;
     display: flex;
     flex-direction: column;
@@ -9,7 +9,8 @@
     min-width: 0;
     box-sizing: border-box;
     margin-top: 20px;
-    margin-inline: calc((100% - var(--presence-lab-shell-width)) / 2);
+    left: 50%;
+    transform: translateX(-50%);
     isolation: isolate;
 }
 
@@ -692,6 +693,8 @@
         min-width: 0;
         max-width: 100%;
         margin: 20px 0 0;
+        left: auto;
+        transform: none;
     }
 
     .vc-presence-lab-metric-grid,
