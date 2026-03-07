@@ -1,5 +1,4 @@
 import * as DataStore from "@api/DataStore";
-import { useAwaiter } from "@utils/react";
 import { React, UserStore } from "@webpack/common";
 import type { DispatchWithoutAction } from "react";
 
@@ -149,19 +148,35 @@ export async function removeSentTrailRecordsWhere(
 
 export function useSentTrailRecords(userId: string | null) {
     const [signal, setSignal] = React.useReducer(value => value + 1, 0);
+    const [records, setRecords] = React.useState<SentTrailRecord[]>([]);
+    const [pending, setPending] = React.useState(true);
+    const previousUserIdRef = React.useRef<string | null | undefined>(void 0);
 
     React.useEffect(() => {
         signals.add(setSignal);
         return () => void signals.delete(setSignal);
     }, []);
 
-    const [records, _, pending] = useAwaiter(
-        () => getSentTrailRecords(userId),
-        {
-            fallbackValue: [],
-            deps: [userId, signal],
-        },
-    );
+    React.useEffect(() => {
+        let isAlive = true;
+        const userChanged = previousUserIdRef.current !== userId;
+        previousUserIdRef.current = userId;
+
+        if (userChanged) {
+            setPending(true);
+            if (!userId) setRecords([]);
+        }
+
+        void getSentTrailRecords(userId).then(nextRecords => {
+            if (!isAlive) return;
+            setRecords(nextRecords);
+            setPending(false);
+        });
+
+        return () => {
+            isAlive = false;
+        };
+    }, [userId, signal]);
 
     return [records, pending] as const;
 }
