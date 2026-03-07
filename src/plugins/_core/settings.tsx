@@ -196,15 +196,10 @@ export default definePlugin({
         return settingsSectionMap;
     },
 
-    buildLayout(originalLayoutBuilder: SettingsLayoutBuilder) {
-        const layout = originalLayoutBuilder.buildLayout();
-        if (originalLayoutBuilder.key !== "$Root") return layout;
-        if (!Array.isArray(layout)) return layout;
-        if (layout.some(s => s?.key === "equicord_section")) return layout;
-
+    getSectionEntries() {
         const { buildEntry } = this;
 
-        const equicordEntries: SettingsLayoutNode[] = [
+        return [
             buildEntry({
                 key: "equicord_main",
                 title: BRAND_NAME,
@@ -258,12 +253,19 @@ export default definePlugin({
             }),
             ...this.customEntries.map(buildEntry)
         ].filter(isTruthy);
+    },
+
+    buildLayout(originalLayoutBuilder: SettingsLayoutBuilder) {
+        const layout = originalLayoutBuilder.buildLayout();
+        if (originalLayoutBuilder.key !== "$Root") return layout;
+        if (!Array.isArray(layout)) return layout;
+        if (layout.some(s => s?.key === "equicord_section")) return layout;
 
         const equicordSection: SettingsLayoutNode = {
             key: "equicord_section",
             type: LayoutTypes.SECTION,
             useTitle: () => `${BRAND_NAME} Settings`,
-            buildLayout: () => equicordEntries
+            buildLayout: () => this.getSectionEntries()
         };
 
         const { settingsLocation } = settings.store;

@@ -223,8 +223,13 @@ function scheduleEnrichment(channelId: string, messageId: string, guildId?: stri
 }
 
 function unregisterSendTrailSettingsTab() {
-    removeFromArray(SettingsPlugin.customEntries, entry => entry.key === SEND_TRAIL_SETTINGS_KEY);
-    removeFromArray(SettingsPlugin.settingsSectionMap, entry => entry[1] === SEND_TRAIL_SETTINGS_KEY);
+    while (SettingsPlugin.customEntries.some(entry => entry.key === SEND_TRAIL_SETTINGS_KEY)) {
+        removeFromArray(SettingsPlugin.customEntries, entry => entry.key === SEND_TRAIL_SETTINGS_KEY);
+    }
+
+    while (SettingsPlugin.settingsSectionMap.some(entry => entry[1] === SEND_TRAIL_SETTINGS_KEY)) {
+        removeFromArray(SettingsPlugin.settingsSectionMap, entry => entry[1] === SEND_TRAIL_SETTINGS_KEY);
+    }
 }
 
 function registerSendTrailSettingsTab() {
