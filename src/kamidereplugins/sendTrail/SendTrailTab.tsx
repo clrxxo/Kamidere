@@ -1194,6 +1194,7 @@ function SendTrailTab() {
                             <span className={cl("pagination-page-size-label")}>Rows per page:</span>
                             <div className={cl("pagination-page-size-select")}>
                                 <Select
+                                    className={cl("pagination-page-size-control")}
                                     options={pageSizeOptions}
                                     select={changePageSize}
                                     isSelected={(value: PageSizeValue) => pageSize === value}

@@ -482,6 +482,18 @@
     width: 96px;
 }
 
+.vc-send-trail-pagination-page-size-control > div {
+    min-width: 96px;
+}
+
+.vc-send-trail-pagination-page-size-control [class*="singleValue"],
+.vc-send-trail-pagination-page-size-control [class*="placeholder"] {
+    max-width: none;
+    overflow: visible;
+    text-overflow: clip;
+    white-space: nowrap;
+}
+
 .vc-send-trail-history-footer-secondary {
     align-items: center;
     justify-content: space-between;
