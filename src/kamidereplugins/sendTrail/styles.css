@@ -249,9 +249,10 @@
 }
 
 .vc-send-trail-action-button-purge {
-    min-width: 152px;
+    min-width: 134px;
     min-height: 36px;
-    padding-inline: 14px;
+    padding-inline: 12px;
+    justify-content: center;
     box-shadow: 0 10px 22px rgb(237 66 69 / 18%), inset 0 1px 0 rgb(255 255 255 / 6%);
 }
 
@@ -360,6 +361,8 @@
     border: 0;
     background: transparent;
     color: var(--text-normal);
+    -webkit-text-fill-color: var(--text-normal);
+    caret-color: var(--text-normal);
     font: inherit;
     line-height: 1.4;
 }
@@ -398,9 +401,23 @@
 
 .vc-send-trail-history-actions-row {
     display: flex;
-    justify-content: flex-end;
+    align-items: center;
+    justify-content: space-between;
     gap: 6px;
     margin-top: 12px;
+}
+
+.vc-send-trail-history-search-shell {
+    flex: 1 1 420px;
+    max-width: 520px;
+    min-height: 44px;
+}
+
+.vc-send-trail-history-actions-buttons {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 0 0 auto;
 }
 
 .vc-send-trail-history-list {
@@ -923,6 +940,8 @@
     border: 0;
     background: transparent;
     color: var(--text-normal);
+    -webkit-text-fill-color: var(--text-normal);
+    caret-color: var(--text-normal);
     font: inherit;
     outline: none;
 }
@@ -934,6 +953,22 @@
 .vc-send-trail-config-save-button {
     min-height: 40px;
     padding-inline: 14px;
+}
+
+.vc-send-trail-config-user-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+}
+
+.vc-send-trail-config-user-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 999px;
+    object-fit: cover;
+    background: var(--vc-send-trail-surface-alt);
+    flex: 0 0 40px;
 }
 
 .vc-send-trail-config-item-copy {
@@ -997,6 +1032,16 @@
     .vc-send-trail-history-actions-row {
         justify-content: flex-start;
         flex-wrap: wrap;
+    }
+
+    .vc-send-trail-history-search-shell {
+        flex-basis: 100%;
+        max-width: none;
+    }
+
+    .vc-send-trail-history-actions-buttons {
+        width: 100%;
+        justify-content: flex-start;
     }
 
     .vc-send-trail-config-manual-row {

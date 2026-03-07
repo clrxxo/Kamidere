@@ -86,6 +86,7 @@ interface DmUserContact {
     label: string;
     details: string;
     count: number;
+    avatarUrl: string;
 }
 
 function showToast(message: string, type: any) {
@@ -136,14 +137,25 @@ function isRecordProtected(
     return false;
 }
 
+function getDefaultAvatarUrl(userId: string) {
+    const index = Number(BigInt(userId || "0") % 6n);
+    return `https://cdn.discordapp.com/embed/avatars/${index}.png`;
+}
+
 function resolveRecipientIdentity(recipientId: string, channel: ReturnType<typeof ChannelStore.getChannel>) {
-    const user = UserStore.getUser(recipientId);
+    const user = UserStore.getUser(recipientId) as { avatar?: string | null; username?: string; globalName?: string; global_name?: string; } | undefined;
     if (user) {
+        const avatarHash = user.avatar;
+        const avatarUrl = avatarHash
+            ? `https://cdn.discordapp.com/avatars/${recipientId}/${avatarHash}.${avatarHash.startsWith("a_") ? "gif" : "png"}?size=80`
+            : getDefaultAvatarUrl(recipientId);
+
         return {
-            label: user.globalName || user.username || recipientId,
-            details: user.globalName && user.username && user.globalName !== user.username
+            label: user.globalName || user.global_name || user.username || recipientId,
+            details: (user.globalName || user.global_name) && user.username && (user.globalName || user.global_name) !== user.username
                 ? `@${user.username}`
                 : `User ID ${recipientId}`,
+            avatarUrl,
         };
     }
 
@@ -156,6 +168,7 @@ function resolveRecipientIdentity(recipientId: string, channel: ReturnType<typeo
         details: rawRecipient?.username && rawRecipient.username !== rawRecipient.global_name
             ? `@${rawRecipient.username}`
             : `User ID ${recipientId}`,
+        avatarUrl: getDefaultAvatarUrl(recipientId),
     };
 }
 
@@ -222,6 +235,7 @@ function buildDmUserContacts(records: SentTrailRecord[], protectedDmUserIds: Set
                 label: identity.label,
                 details: identity.details,
                 count: 1,
+                avatarUrl: identity.avatarUrl,
             });
         }
     }
@@ -234,6 +248,7 @@ function buildDmUserContacts(records: SentTrailRecord[], protectedDmUserIds: Set
             label: userId,
             details: "Manual user ID rule",
             count: 0,
+            avatarUrl: getDefaultAvatarUrl(userId),
         });
     }
 
@@ -514,14 +529,22 @@ function SendTrailConfigModal({
                     <div className={cl("config-list")}>
                         {dmUserContacts.map(contact => (
                             <Card key={contact.userId} className={cl("config-item")} defaultPadding>
-                                <div className={cl("config-item-copy")}>
-                                    <BaseText size="md" weight="semibold">{contact.label}</BaseText>
-                                    <Paragraph className={cl("config-hint")}>
-                                        {contact.details} / User ID {contact.userId}
-                                        {contact.count
-                                            ? ` / ${contact.count} saved DM message${contact.count === 1 ? "" : "s"}`
-                                            : " / no DM history loaded yet"}
-                                    </Paragraph>
+                                <div className={cl("config-user-row")}>
+                                    <img
+                                        className={cl("config-user-avatar")}
+                                        src={contact.avatarUrl}
+                                        alt={contact.label}
+                                        loading="lazy"
+                                    />
+                                    <div className={cl("config-item-copy")}>
+                                        <BaseText size="md" weight="semibold">{contact.label}</BaseText>
+                                        <Paragraph className={cl("config-hint")}>
+                                            {contact.details} / User ID {contact.userId}
+                                            {contact.count
+                                                ? ` / ${contact.count} saved DM message${contact.count === 1 ? "" : "s"}`
+                                                : " / no DM history loaded yet"}
+                                        </Paragraph>
+                                    </div>
                                 </div>
                                 <Switch
                                     checked={protectedDmUserIds.has(contact.userId)}
@@ -1170,6 +1193,7 @@ function SendTrailTab() {
                                 Purge target: {purgeTarget === "all" ? "everything" : purgeTarget === "dms" ? "DMs only" : "servers only"}
                                 {purgeConfig.protectAllDms ? " / all DMs protected" : ""}
                                 {protectedDmChannels.size ? ` / ${protectedDmChannels.size} DM thread${protectedDmChannels.size === 1 ? "" : "s"} protected` : ""}
+                                {protectedDmUserIds.size ? ` / ${protectedDmUserIds.size} DM user${protectedDmUserIds.size === 1 ? "" : "s"} protected` : ""}
                             </Paragraph>
                         </div>
 
@@ -1209,47 +1233,48 @@ function SendTrailTab() {
                             />
                         </div>
 
-                        <div className={cl("toolbar-field", "search")}>
-                            <Paragraph className={cl("field-label")}>Search</Paragraph>
-                            <label className={cl("search-shell")}>
-                                <MagnifyingGlassIcon className={cl("search-icon")} width={16} height={16} />
-                                <input
-                                    className={cl("search-input")}
-                                    type="text"
-                                    value={query}
-                                    placeholder="Search messages, channels, servers, or media"
-                                    onChange={event => setQuery(event.currentTarget.value)}
-                                    disabled={isBusy}
-                                    spellCheck={false}
-                                />
-                            </label>
-                        </div>
                     </div>
 
                 </div>
 
                 <div className={cl("history-actions-row")}>
-                    <Button
-                        size="iconOnly"
-                        variant="secondary"
-                        className={cl("action-icon-button")}
-                        disabled={isBusy}
-                        onClick={openConfigModal}
-                        title="Open purge config"
-                        aria-label="Open purge config"
-                    >
-                        <CogWheel width={16} height={16} />
-                    </Button>
-                    <Button
-                        size="xs"
-                        variant="dangerPrimary"
-                        className={cl("action-button", "action-button-purge")}
-                        disabled={purgeActionRecords.length === 0 || isBusy}
-                        onClick={confirmPurge}
-                    >
-                        <DeleteIcon width={13} height={13} />
-                        <span>{purgeActionLabel}</span>
-                    </Button>
+                    <label className={cl("search-shell", "history-search-shell")}>
+                        <MagnifyingGlassIcon className={cl("search-icon")} width={16} height={16} />
+                        <input
+                            className={cl("search-input")}
+                            type="text"
+                            value={query}
+                            placeholder="Search messages, channels, servers, or media"
+                            onChange={event => setQuery(event.currentTarget.value)}
+                            disabled={isBusy}
+                            spellCheck={false}
+                            aria-label="Search sent messages"
+                        />
+                    </label>
+
+                    <div className={cl("history-actions-buttons")}>
+                        <Button
+                            size="iconOnly"
+                            variant="secondary"
+                            className={cl("action-icon-button")}
+                            disabled={isBusy}
+                            onClick={openConfigModal}
+                            title="Open purge config"
+                            aria-label="Open purge config"
+                        >
+                            <CogWheel width={16} height={16} />
+                        </Button>
+                        <Button
+                            size="xs"
+                            variant="dangerPrimary"
+                            className={cl("action-button", "action-button-purge")}
+                            disabled={purgeActionRecords.length === 0 || isBusy}
+                            onClick={confirmPurge}
+                        >
+                            <DeleteIcon width={13} height={13} />
+                            <span>{purgeActionLabel}</span>
+                        </Button>
+                    </div>
                 </div>
 
                 <div
