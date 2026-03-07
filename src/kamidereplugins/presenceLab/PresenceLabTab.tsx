@@ -573,7 +573,7 @@ function PresenceLabTab() {
                 </div>
             </Card>
 
-            <div className={cl("overview-grid")}>
+            <div className={cl("dashboard-grid")}>
                 <div className={cl("overview-stack")}>
                     <div className={cl("metric-grid")}>
                         <MetricCard
@@ -610,6 +610,7 @@ function PresenceLabTab() {
                     </div>
                 </div>
 
+                <div className={cl("dashboard-side")}>
                 <Card className={cl("runtime-card")} defaultPadding>
                     <div className={cl("section-head")}>
                         <div>
@@ -663,7 +664,6 @@ function PresenceLabTab() {
                         <TextButton variant="danger" onClick={clearLab}>Clear Local Lab</TextButton>
                     </div>
                 </Card>
-            </div>
 
             <div className={cl("roster-grid")}>
                 <Card className={cl("panel-card")} defaultPadding>
@@ -834,6 +834,7 @@ function PresenceLabTab() {
                     </Button>
                 </div>
             </Card>
+            </div>
 
             <Card className={cl("panel-card", "history-card")} defaultPadding>
                 <div className={cl("section-head")}>
@@ -914,6 +915,7 @@ function PresenceLabTab() {
                     </div>
                 )}
             </Card>
+            </div>
             </div>
         </SettingsTab>
     );

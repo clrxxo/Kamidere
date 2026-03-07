@@ -13,12 +13,8 @@
     inset: 0;
     z-index: -1;
     border-radius: 18px;
-    background:
-        radial-gradient(circle at center, rgba(226, 177, 90, 0.08), transparent 36%),
-        radial-gradient(circle, rgba(255, 255, 255, 0.12) 1px, transparent 1px);
-    background-size: 100% 100%, 16px 16px;
-    background-position: center, 0 0;
-    opacity: 0.48;
+    background: radial-gradient(circle at center, rgba(226, 177, 90, 0.06), transparent 42%);
+    opacity: 0.22;
     pointer-events: none;
 }
 
@@ -34,11 +30,18 @@
     box-shadow: 0 26px 64px rgba(0, 0, 0, 0.28);
 }
 
-.vc-presence-lab-overview-grid {
+.vc-presence-lab-dashboard-grid {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     gap: 18px;
     margin-top: 0;
+}
+
+.vc-presence-lab-dashboard-side {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    min-width: 0;
 }
 
 .vc-presence-lab-overview-stack,
@@ -112,7 +115,21 @@
 }
 
 .vc-presence-lab-cadence-strip {
+    position: relative;
     padding: 20px;
+    overflow: hidden;
+}
+
+.vc-presence-lab-cadence-strip::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background:
+        radial-gradient(circle, rgba(255, 255, 255, 0.1) 1px, transparent 1px);
+    background-size: 24px 24px;
+    opacity: 0.12;
+    pointer-events: none;
 }
 
 .vc-presence-lab-cadence-strip-top,
@@ -617,13 +634,14 @@
     }
 }
 
-@media (min-width: 1320px) {
-    .vc-presence-lab-overview-grid {
-        grid-template-columns: minmax(0, 1.38fr) minmax(320px, 0.92fr);
+@media (min-width: 1080px) {
+    .vc-presence-lab-dashboard-grid {
+        grid-template-columns: minmax(0, 1.32fr) minmax(300px, 0.88fr);
+        align-items: start;
     }
 
     .vc-presence-lab-gauge-grid {
-        grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
     .vc-presence-lab-insight-grid {
@@ -631,15 +649,11 @@
     }
 
     .vc-presence-lab-runtime-stat-grid {
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-    }
-
-    .vc-presence-lab-roster-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
     .vc-presence-lab-field-grid-three {
-        grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }
 
@@ -648,6 +662,17 @@
     .vc-presence-lab-field-grid,
     .vc-presence-lab-field-grid-four {
         grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (min-width: 1320px) {
+    .vc-presence-lab-gauge-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .vc-presence-lab-runtime-stat-grid,
+    .vc-presence-lab-field-grid-three {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 }
 
