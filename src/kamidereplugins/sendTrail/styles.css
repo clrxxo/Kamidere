@@ -364,60 +364,128 @@
     margin-top: 16px;
     padding-top: 14px;
     border-top: 1px solid var(--vc-send-trail-border);
-    align-items: flex-start;
-    gap: 16px;
-    flex-wrap: wrap;
-}
-
-.vc-send-trail-history-footer-copy {
-    flex: 1 1 240px;
-    max-width: 320px;
-    gap: 6px;
-}
-
-.vc-send-trail-history-footer-actions {
-    flex: 1 1 320px;
+    display: flex;
     flex-direction: column;
-    align-items: flex-end;
-    gap: 8px;
-    margin-left: auto;
-}
-
-.vc-send-trail-history-pagination-row {
-    flex-wrap: wrap;
-    align-items: flex-end;
-    justify-content: flex-end;
     gap: 10px;
 }
 
-.vc-send-trail-pagination-field {
-    flex-direction: column;
-    gap: 6px;
-    min-width: 126px;
+.vc-send-trail-history-footer-main,
+.vc-send-trail-history-footer-secondary,
+.vc-send-trail-pagination-center,
+.vc-send-trail-pagination-page-size {
+    display: flex;
 }
 
-.vc-send-trail-pagination-controls {
+.vc-send-trail-history-footer-main {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
     align-items: center;
-    gap: 6px;
+    gap: 16px;
 }
 
-.vc-send-trail-pagination-status {
+.vc-send-trail-pagination-summary {
+    color: var(--text-muted);
+    font-size: 0.82rem;
+    line-height: 1.4;
+    white-space: nowrap;
+}
+
+.vc-send-trail-pagination-center {
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+}
+
+.vc-send-trail-pagination-nav-button {
     display: inline-flex;
     align-items: center;
-    min-height: 24px;
-    min-width: 44px;
     justify-content: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--interactive-normal);
+    transition: background-color 160ms ease, color 160ms ease, opacity 160ms ease;
+}
+
+.vc-send-trail-pagination-nav-button:hover:not(:disabled) {
+    background: rgb(255 255 255 / 5%);
+    color: var(--interactive-hover);
+}
+
+.vc-send-trail-pagination-nav-button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.vc-send-trail-pagination-nav-glyph {
+    display: inline-flex;
+    align-items: center;
+    gap: 1px;
+}
+
+.vc-send-trail-pagination-nav-chevron {
+    width: 7px;
+    height: 7px;
+    border-top: 1.5px solid currentColor;
+    border-right: 1.5px solid currentColor;
+    transform: rotate(45deg);
+}
+
+.vc-send-trail-pagination-nav-left .vc-send-trail-pagination-nav-chevron {
+    transform: rotate(-135deg);
+}
+
+.vc-send-trail-pagination-page-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 28px;
+    height: 24px;
     padding: 0 8px;
     border: 1px solid rgb(255 255 255 / 8%);
     border-radius: 8px;
     background: rgb(255 255 255 / 4%);
-    color: var(--text-muted);
-    font-size: 0.75rem;
+    color: var(--header-primary);
+    font-size: 0.78rem;
     font-weight: 600;
+}
+
+.vc-send-trail-pagination-of-label {
+    color: var(--text-muted);
+    font-size: 0.82rem;
+    line-height: 1;
+    margin: 0 6px 0 4px;
+}
+
+.vc-send-trail-pagination-page-size {
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.vc-send-trail-pagination-page-size-label {
+    color: var(--text-muted);
+    font-size: 0.82rem;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.vc-send-trail-pagination-page-size-select {
+    width: 78px;
+}
+
+.vc-send-trail-history-footer-secondary {
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
 }
 
 .vc-send-trail-history-footer-clear {
     font-size: 0.78rem;
+    flex: 0 0 auto;
 }
 
 .vc-send-trail-toolbar-hint,
@@ -785,7 +853,6 @@
     .vc-send-trail-history-shell-header,
     .vc-send-trail-history-filter-header,
     .vc-send-trail-history-controls-row,
-    .vc-send-trail-history-footer,
     .vc-send-trail-group-header,
     .vc-send-trail-record-header,
     .vc-send-trail-record-footer,
@@ -821,22 +888,30 @@
         min-width: 0;
     }
 
-    .vc-send-trail-history-footer-actions,
-    .vc-send-trail-pagination-controls {
-        flex-wrap: wrap;
-        align-items: stretch;
+    .vc-send-trail-history-footer-main {
+        grid-template-columns: 1fr;
+        justify-items: start;
+        gap: 10px;
     }
 
-    .vc-send-trail-history-footer-actions,
-    .vc-send-trail-history-pagination-row {
+    .vc-send-trail-pagination-center,
+    .vc-send-trail-pagination-page-size,
+    .vc-send-trail-history-footer-secondary {
         width: 100%;
         justify-content: flex-start;
-        align-items: stretch;
-        margin-left: 0;
     }
 
-    .vc-send-trail-pagination-field {
-        min-width: 0;
-        width: 100%;
+    .vc-send-trail-pagination-page-size,
+    .vc-send-trail-history-footer-secondary {
+        flex-wrap: wrap;
+        align-items: flex-start;
+    }
+
+    .vc-send-trail-pagination-summary {
+        white-space: normal;
+    }
+
+    .vc-send-trail-pagination-page-size-select {
+        width: 72px;
     }
 }

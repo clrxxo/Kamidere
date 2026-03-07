@@ -26,7 +26,7 @@ const cl = classNameFactory("vc-send-trail-");
 const LIVE_DELETE_DELAY_MS = 850;
 const PURGE_STATUS_HIDE_DELAY_MS = 2400;
 const PURGE_STATUS_TRANSITION_MS = 280;
-const DEFAULT_PAGE_SIZE: PageSizeValue = "15";
+const DEFAULT_PAGE_SIZE: PageSizeValue = "10";
 
 const HERO_BACKGROUND = `data:image/svg+xml;utf8,${encodeURIComponent(
     [
@@ -51,7 +51,7 @@ const HERO_BACKGROUND = `data:image/svg+xml;utf8,${encodeURIComponent(
 type ScopeValue = "all" | "dms" | `guild:${string}`;
 type KindValue = "all" | "text" | "media";
 type PeriodValue = "all" | "24h" | "7d";
-type PageSizeValue = "15" | "30" | "60";
+type PageSizeValue = "10" | "20" | "30" | "50";
 type PurgeStatusPhase = "idle" | "running" | "success" | "partial" | "failure";
 
 interface SelectOption<T extends string> {
@@ -424,6 +424,49 @@ function RecordCard({
     );
 }
 
+function PaginationChevron({ direction, double = false }: { direction: "left" | "right"; double?: boolean; }) {
+    return (
+        <span
+            className={cl(
+                "pagination-nav-glyph",
+                direction === "left" ? "pagination-nav-left" : "pagination-nav-right",
+                double && "pagination-nav-double",
+            )}
+            aria-hidden="true"
+        >
+            <span className={cl("pagination-nav-chevron")} />
+            {double && <span className={cl("pagination-nav-chevron")} />}
+        </span>
+    );
+}
+
+function PaginationNavButton({
+    direction,
+    double = false,
+    disabled,
+    label,
+    onClick,
+}: {
+    direction: "left" | "right";
+    double?: boolean;
+    disabled: boolean;
+    label: string;
+    onClick(): void;
+}) {
+    return (
+        <button
+            type="button"
+            className={cl("pagination-nav-button")}
+            disabled={disabled}
+            aria-label={label}
+            title={label}
+            onClick={onClick}
+        >
+            <PaginationChevron direction={direction} double={double} />
+        </button>
+    );
+}
+
 function SendTrailTab() {
     const currentUserId = useStateFromStores([UserStore], () => UserStore.getCurrentUser()?.id ?? null);
     const [records, pending] = useSentTrailRecords(currentUserId);
@@ -567,9 +610,10 @@ function SendTrailTab() {
     ];
 
     const pageSizeOptions: SelectOption<PageSizeValue>[] = [
-        { label: "15 messages", value: "15" },
-        { label: "30 messages", value: "30" },
-        { label: "60 messages", value: "60" },
+        { label: "10", value: "10" },
+        { label: "20", value: "20" },
+        { label: "30", value: "30" },
+        { label: "50", value: "50" },
     ];
 
     const filteredRecords = React.useMemo(() => {
@@ -1041,19 +1085,47 @@ function SendTrailTab() {
                 </div>
 
                 <div className={cl("history-footer")}>
-                    <div className={cl("history-footer-copy")}>
-                        <Paragraph className={cl("history-summary")}>
-                            Showing {pageRangeStart}-{pageRangeEnd} of {filteredRecords.length} matching message{filteredRecords.length === 1 ? "" : "s"}.
-                        </Paragraph>
-                        <Paragraph className={cl("history-summary")}>
-                            Local only. Purge deletes live Discord messages one by one.
-                        </Paragraph>
-                    </div>
+                    <div className={cl("history-footer-main")}>
+                        <span className={cl("pagination-summary")}>
+                            Showing {pageRangeStart}-{pageRangeEnd} from {filteredRecords.length}
+                        </span>
 
-                    <div className={cl("history-footer-actions")}>
-                        <div className={cl("history-pagination-row")}>
-                            <div className={cl("pagination-field")}>
-                                <Paragraph className={cl("field-label")}>Messages</Paragraph>
+                        <div className={cl("pagination-center")}>
+                            <PaginationNavButton
+                                direction="left"
+                                double
+                                disabled={currentPage <= 1 || filteredRecords.length === 0 || isBusy}
+                                label="First page"
+                                onClick={() => setCurrentPage(1)}
+                            />
+                            <PaginationNavButton
+                                direction="left"
+                                disabled={currentPage <= 1 || filteredRecords.length === 0 || isBusy}
+                                label="Previous page"
+                                onClick={() => setCurrentPage(page => Math.max(1, page - 1))}
+                            />
+
+                            <span className={cl("pagination-page-chip")}>{currentPage}</span>
+                            <span className={cl("pagination-of-label")}>of {totalPages}</span>
+
+                            <PaginationNavButton
+                                direction="right"
+                                disabled={currentPage >= totalPages || filteredRecords.length === 0 || isBusy}
+                                label="Next page"
+                                onClick={() => setCurrentPage(page => Math.min(totalPages, page + 1))}
+                            />
+                            <PaginationNavButton
+                                direction="right"
+                                double
+                                disabled={currentPage >= totalPages || filteredRecords.length === 0 || isBusy}
+                                label="Last page"
+                                onClick={() => setCurrentPage(totalPages)}
+                            />
+                        </div>
+
+                        <div className={cl("pagination-page-size")}>
+                            <span className={cl("pagination-page-size-label")}>Rows per page:</span>
+                            <div className={cl("pagination-page-size-select")}>
                                 <Select
                                     options={pageSizeOptions}
                                     select={(value: PageSizeValue) => setPageSize(value)}
@@ -1062,29 +1134,13 @@ function SendTrailTab() {
                                     isDisabled={isBusy || filteredRecords.length === 0}
                                 />
                             </div>
-
-                            <div className={cl("pagination-controls")}>
-                                <Button
-                                    size="xs"
-                                    variant="secondary"
-                                    disabled={currentPage <= 1 || filteredRecords.length === 0 || isBusy}
-                                    onClick={() => setCurrentPage(page => Math.max(1, page - 1))}
-                                >
-                                    Prev
-                                </Button>
-                                <span className={cl("pagination-status")}>
-                                    {currentPage} / {totalPages}
-                                </span>
-                                <Button
-                                    size="xs"
-                                    variant="secondary"
-                                    disabled={currentPage >= totalPages || filteredRecords.length === 0 || isBusy}
-                                    onClick={() => setCurrentPage(page => Math.min(totalPages, page + 1))}
-                                >
-                                    Next
-                                </Button>
-                            </div>
                         </div>
+                    </div>
+
+                    <div className={cl("history-footer-secondary")}>
+                        <Paragraph className={cl("history-summary")}>
+                            Local only. Purge deletes live Discord messages one by one.
+                        </Paragraph>
 
                         <TextButton
                             variant="secondary"
