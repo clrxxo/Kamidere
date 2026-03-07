@@ -259,7 +259,11 @@ export default definePlugin({
         const layout = originalLayoutBuilder.buildLayout();
         if (originalLayoutBuilder.key !== "$Root") return layout;
         if (!Array.isArray(layout)) return layout;
-        if (layout.some(s => s?.key === "equicord_section")) return layout;
+
+        const existingSectionIndex = layout.findIndex(s => s?.key === "equicord_section");
+        if (existingSectionIndex !== -1) {
+            layout.splice(existingSectionIndex, 1);
+        }
 
         const equicordSection: SettingsLayoutNode = {
             key: "equicord_section",
