@@ -11,7 +11,7 @@ import { AddonCard } from "@components/settings/AddonCard";
 import SettingsPlugin from "@plugins/_core/settings";
 import { classNameFactory } from "@utils/css";
 import { Logger } from "@utils/Logger";
-import { closeAllModals, closeModal, hasModalOpen } from "@utils/modal";
+import { closeAllModals } from "@utils/modal";
 import { removeFromArray } from "@utils/misc";
 import { OptionType, Plugin } from "@utils/types";
 import { FluxDispatcher, React, SettingsRouter, showToast, Toasts } from "@webpack/common";
@@ -24,6 +24,8 @@ import { getPluginSourceInfo } from "./pluginSource";
 
 const logger = new Logger("PluginCard");
 const cl = classNameFactory("vc-plugins-");
+const SETTINGS_SIDEBAR_VISIBILITY_RETRY_DELAYS_MS = [0, 80, 180, 320, 520];
+const SETTINGS_SIDEBAR_VISIBILITY_OBSERVER_LIFETIME_MS = 1500;
 
 interface PluginCardProps extends React.HTMLProps<HTMLDivElement> {
     plugin: Plugin;
@@ -36,9 +38,7 @@ interface PluginCardProps extends React.HTMLProps<HTMLDivElement> {
 
 const SETTINGS_TAB_STATUS_HIDE_DELAY_MS = 2200;
 const SETTINGS_TAB_STATUS_TRANSITION_MS = 280;
-const SETTINGS_MODAL_CLOSE_TIMEOUT_MS = 2000;
-const SETTINGS_MODAL_POLL_INTERVAL_MS = 32;
-const SETTINGS_MODAL_REOPEN_DELAY_MS = 48;
+const SETTINGS_MODAL_REOPEN_DELAY_MS = 110;
 
 function wait(ms: number) {
     return new Promise<void>(resolve => window.setTimeout(resolve, ms));
@@ -65,28 +65,61 @@ function syncRegisteredSettingsTab(plugin: Plugin, enabled: boolean) {
     SettingsPlugin.invalidateSectionLayout();
 }
 
-function syncLiveSettingsTabVisibility(plugin: Plugin, enabled: boolean) {
+function findLiveSettingsTabNodes(title: string) {
+    const modalRoot = document.querySelector<HTMLElement>("[aria-modal='true']");
+    if (!modalRoot) return [];
+
+    const matches = new Set<HTMLElement>();
+    const candidates = modalRoot.querySelectorAll<HTMLElement>("button, a, [role='button'], [role='tab'], div, span");
+
+    for (const candidate of candidates) {
+        const text = candidate.textContent?.replace(/\s+/g, " ").trim();
+        if (!text || !text.includes(title)) continue;
+
+        const interactive = candidate.closest<HTMLElement>("button, a, [role='button'], [role='tab']");
+        if (!interactive) continue;
+
+        const sidebarContainer = interactive.closest("nav, aside, [class*='sidebar'], [class*='standardSidebarView'], [class*='side']");
+        if (!sidebarContainer) continue;
+
+        matches.add(interactive);
+    }
+
+    return [...matches];
+}
+
+function applyLiveSettingsTabVisibility(plugin: Plugin, enabled: boolean) {
     const title = plugin.settingsTab?.title?.trim();
     if (!title) return;
 
-    const selectors = "button, a, [role='button'], [role='tab']";
-    const elements = [...document.querySelectorAll<HTMLElement>(selectors)];
-
-    for (const element of elements) {
-        const text = element.innerText?.trim();
-        if (text !== title) continue;
-        if (!element.closest("[aria-modal='true']")) continue;
-
+    for (const node of findLiveSettingsTabNodes(title)) {
         if (enabled) {
-            if (element.dataset.kamidereSettingsTabHidden === "true") {
-                element.style.removeProperty("display");
-                delete element.dataset.kamidereSettingsTabHidden;
+            if (node.dataset.kamidereSettingsTabHidden === "true") {
+                node.style.removeProperty("display");
+                node.style.removeProperty("visibility");
+                node.style.removeProperty("pointer-events");
+                delete node.dataset.kamidereSettingsTabHidden;
             }
         } else {
-            element.style.display = "none";
-            element.dataset.kamidereSettingsTabHidden = "true";
+            node.style.display = "none";
+            node.style.visibility = "hidden";
+            node.style.pointerEvents = "none";
+            node.dataset.kamidereSettingsTabHidden = "true";
         }
     }
+}
+
+function syncLiveSettingsTabVisibility(plugin: Plugin, enabled: boolean) {
+    for (const delay of SETTINGS_SIDEBAR_VISIBILITY_RETRY_DELAYS_MS) {
+        window.setTimeout(() => applyLiveSettingsTabVisibility(plugin, enabled), delay);
+    }
+
+    const modalRoot = document.querySelector<HTMLElement>("[aria-modal='true']");
+    if (!modalRoot) return;
+
+    const observer = new MutationObserver(() => applyLiveSettingsTabVisibility(plugin, enabled));
+    observer.observe(modalRoot, { childList: true, subtree: true, attributes: true });
+    window.setTimeout(() => observer.disconnect(), SETTINGS_SIDEBAR_VISIBILITY_OBSERVER_LIFETIME_MS);
 }
 
 export function PluginCard({ plugin, disabled, onRestartNeeded, onMouseEnter, onMouseLeave, isNew }: PluginCardProps) {
@@ -114,25 +147,9 @@ export function PluginCard({ plugin, disabled, onRestartNeeded, onMouseEnter, on
     async function refreshPluginSettingsView() {
         if (!plugin.settingsTab) return;
 
-        const settingsModalKey = SettingsRouter?.USER_SETTINGS_MODAL_KEY;
-
         try {
-            if (typeof settingsModalKey === "string" && hasModalOpen(settingsModalKey)) {
-                closeModal(settingsModalKey);
-
-                const deadline = Date.now() + SETTINGS_MODAL_CLOSE_TIMEOUT_MS;
-                while (hasModalOpen(settingsModalKey) && Date.now() < deadline) {
-                    await wait(SETTINGS_MODAL_POLL_INTERVAL_MS);
-                }
-            } else {
-                closeAllModals();
-                await wait(SETTINGS_MODAL_REOPEN_DELAY_MS);
-            }
-
-            FluxDispatcher.dispatch({ type: "USER_SETTINGS_MODAL_RESET" });
-            FluxDispatcher.dispatch({ type: "USER_SETTINGS_MODAL_CLEAR_SUBSECTION" });
-            FluxDispatcher.dispatch({ type: "USER_SETTINGS_MODAL_CLEAR_SCROLL_POSITION" });
-
+            FluxDispatcher.dispatch({ type: "USER_SETTINGS_MODAL_CLOSE" });
+            closeAllModals();
             await wait(SETTINGS_MODAL_REOPEN_DELAY_MS);
             await SettingsRouter.openUserSettings("my_account_panel");
             await wait(SETTINGS_MODAL_REOPEN_DELAY_MS);
