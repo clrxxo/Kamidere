@@ -10,9 +10,9 @@ import { CogWheel, InfoIcon } from "@components/Icons";
 import { AddonCard } from "@components/settings/AddonCard";
 import { classNameFactory } from "@utils/css";
 import { Logger } from "@utils/Logger";
-import { closeAllModals } from "@utils/modal";
+import { closeAllModals, closeModal, hasModalOpen } from "@utils/modal";
 import { OptionType, Plugin } from "@utils/types";
-import { React, SettingsRouter, showToast, Toasts } from "@webpack/common";
+import { FluxDispatcher, React, SettingsRouter, showToast, Toasts } from "@webpack/common";
 import { Settings } from "Vencord";
 
 import { PluginMeta } from "~plugins";
@@ -34,7 +34,13 @@ interface PluginCardProps extends React.HTMLProps<HTMLDivElement> {
 
 const SETTINGS_TAB_STATUS_HIDE_DELAY_MS = 2200;
 const SETTINGS_TAB_STATUS_TRANSITION_MS = 280;
-const SETTINGS_MODAL_REOPEN_DELAY_MS = 180;
+const SETTINGS_MODAL_CLOSE_TIMEOUT_MS = 2000;
+const SETTINGS_MODAL_POLL_INTERVAL_MS = 32;
+const SETTINGS_MODAL_REOPEN_DELAY_MS = 48;
+
+function wait(ms: number) {
+    return new Promise<void>(resolve => window.setTimeout(resolve, ms));
+}
 
 export function PluginCard({ plugin, disabled, onRestartNeeded, onMouseEnter, onMouseLeave, isNew }: PluginCardProps) {
     const settings = Settings.plugins[plugin.name];
@@ -61,13 +67,34 @@ export function PluginCard({ plugin, disabled, onRestartNeeded, onMouseEnter, on
     async function refreshPluginSettingsView() {
         if (!plugin.settingsTab) return;
 
+        const settingsModalKey = SettingsRouter?.USER_SETTINGS_MODAL_KEY;
+
         try {
-            closeAllModals();
+            if (typeof settingsModalKey === "string" && hasModalOpen(settingsModalKey)) {
+                closeModal(settingsModalKey);
+
+                const deadline = Date.now() + SETTINGS_MODAL_CLOSE_TIMEOUT_MS;
+                while (hasModalOpen(settingsModalKey) && Date.now() < deadline) {
+                    await wait(SETTINGS_MODAL_POLL_INTERVAL_MS);
+                }
+            } else {
+                closeAllModals();
+                await wait(SETTINGS_MODAL_REOPEN_DELAY_MS);
+            }
+
+            FluxDispatcher.dispatch({ type: "USER_SETTINGS_MODAL_RESET" });
+            FluxDispatcher.dispatch({ type: "USER_SETTINGS_MODAL_CLEAR_SUBSECTION" });
+            FluxDispatcher.dispatch({ type: "USER_SETTINGS_MODAL_CLEAR_SCROLL_POSITION" });
+
+            await wait(SETTINGS_MODAL_REOPEN_DELAY_MS);
+            await SettingsRouter.openUserSettings("my_account_panel");
+            await wait(SETTINGS_MODAL_REOPEN_DELAY_MS);
+            await SettingsRouter.openUserSettings("equicord_plugins_panel");
+        } catch {
+            void SettingsRouter.openUserSettings("my_account_panel");
             window.setTimeout(() => {
                 void SettingsRouter.openUserSettings("equicord_plugins_panel");
             }, SETTINGS_MODAL_REOPEN_DELAY_MS);
-        } catch {
-            void SettingsRouter.openUserSettings("equicord_plugins_panel");
         }
     }
 

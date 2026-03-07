@@ -165,13 +165,23 @@ interface ModalAPI {
      * Close all open modals
      */
     closeAllModals: () => void;
+    /**
+     * Whether a modal with the given key is currently mounted
+     */
+    hasModalOpen: (modalKey: string, contextKey?: string) => boolean;
+    /**
+     * Whether any modal is currently mounted
+     */
+    hasAnyModalOpen: () => boolean;
 }
 
 export const ModalAPI: ModalAPI = mapMangledModuleLazy(".modalKey?", {
     openModalLazy: filters.byCode(".modalKey?"),
     openModal: filters.byCode(",instant:"),
     closeModal: filters.byCode(".onCloseCallback()"),
-    closeAllModals: filters.byCode(".getState();for")
+    closeAllModals: filters.byCode(".getState();for"),
+    hasModalOpen: filters.byCode(".has(", "modalKey"),
+    hasAnyModalOpen: filters.byCode(".size>", ".getState")
 });
 
-export const { openModalLazy, openModal, closeModal, closeAllModals } = ModalAPI;
+export const { openModalLazy, openModal, closeModal, closeAllModals, hasModalOpen, hasAnyModalOpen } = ModalAPI;
