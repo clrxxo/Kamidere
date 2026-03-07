@@ -86,8 +86,7 @@ interface SettingsLayoutBuilder {
 }
 
 const SECTION_KEY_PREFIX = "equicord_section";
-const FIRST_CUSTOM_ENTRY_CLASS = "vc-kamidere-settings-custom-entry-first";
-const CUSTOM_ENTRY_CLASS = "vc-kamidere-settings-custom-entry";
+const CUSTOM_ENTRY_DIVIDER_CLASS = "vc-kamidere-settings-plugin-divider";
 
 const settings = definePluginSettings({
     settingsLocation: {
@@ -345,21 +344,51 @@ export default definePlugin({
         return null;
     },
 
+    isSidebarItemLike(element: HTMLElement) {
+        return element.matches("[aria-controls], [data-item-id], [data-list-item-id], [role='tab'], button")
+            || Boolean(element.querySelector("[aria-controls], [data-item-id], [data-list-item-id], [role='tab'], button"));
+    },
+
+    resolveSidebarDividerAnchor(element: HTMLElement) {
+        let current = element;
+
+        while (current.parentElement && current.parentElement !== document.body) {
+            const parent = current.parentElement;
+            const hasItemSibling = Array.from(parent.children).some((child): child is HTMLElement =>
+                child instanceof HTMLElement
+                && child !== current
+                && this.isSidebarItemLike(child)
+            );
+
+            if (hasItemSibling) return current;
+            current = parent;
+        }
+
+        return element;
+    },
+
+    clearCustomEntrySidebarDecorations() {
+        document.querySelectorAll(`.${CUSTOM_ENTRY_DIVIDER_CLASS}`).forEach(el => el.remove());
+    },
+
     syncCustomEntrySidebarDecorations() {
-        document.querySelectorAll(`.${CUSTOM_ENTRY_CLASS}, .${FIRST_CUSTOM_ENTRY_CLASS}`).forEach(el => {
-            el.classList.remove(CUSTOM_ENTRY_CLASS, FIRST_CUSTOM_ENTRY_CLASS);
-        });
+        this.clearCustomEntrySidebarDecorations();
 
         if (!this.customEntries.length) return;
 
-        const foundElements = this.customEntries
-            .map(entry => ({ entry, element: this.findSidebarItemElement(entry) }))
-            .filter((value): value is { entry: EntryOptions; element: HTMLElement; } => value.element !== null);
+        const firstCustomEntryElement = this.customEntries
+            .map(entry => this.findSidebarItemElement(entry))
+            .find((element): element is HTMLElement => element !== null);
+        if (!firstCustomEntryElement) return;
 
-        if (!foundElements.length) return;
+        const anchor = this.resolveSidebarDividerAnchor(firstCustomEntryElement);
+        const parent = anchor.parentElement;
+        if (!parent) return;
 
-        foundElements.forEach(({ element }) => element.classList.add(CUSTOM_ENTRY_CLASS));
-        foundElements[0].element.classList.add(FIRST_CUSTOM_ENTRY_CLASS);
+        const divider = document.createElement("div");
+        divider.className = CUSTOM_ENTRY_DIVIDER_CLASS;
+        divider.setAttribute("aria-hidden", "true");
+        parent.insertBefore(divider, anchor);
     },
 
     start() {
@@ -386,9 +415,7 @@ export default definePlugin({
             this.sidebarSyncFrame = 0;
         }
 
-        document.querySelectorAll(`.${CUSTOM_ENTRY_CLASS}, .${FIRST_CUSTOM_ENTRY_CLASS}`).forEach(el => {
-            el.classList.remove(CUSTOM_ENTRY_CLASS, FIRST_CUSTOM_ENTRY_CLASS);
-        });
+        this.clearCustomEntrySidebarDecorations();
     },
 
     get electronVersion() {
