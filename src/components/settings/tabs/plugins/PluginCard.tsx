@@ -8,9 +8,11 @@ import { showNotice } from "@api/Notices";
 import { isPluginEnabled, pluginRequiresRestart, startDependenciesRecursive, startPlugin, stopPlugin } from "@api/PluginManager";
 import { CogWheel, InfoIcon } from "@components/Icons";
 import { AddonCard } from "@components/settings/AddonCard";
+import SettingsPlugin from "@plugins/_core/settings";
 import { classNameFactory } from "@utils/css";
 import { Logger } from "@utils/Logger";
 import { closeAllModals, closeModal, hasModalOpen } from "@utils/modal";
+import { removeFromArray } from "@utils/misc";
 import { OptionType, Plugin } from "@utils/types";
 import { FluxDispatcher, React, SettingsRouter, showToast, Toasts } from "@webpack/common";
 import { Settings } from "Vencord";
@@ -40,6 +42,51 @@ const SETTINGS_MODAL_REOPEN_DELAY_MS = 48;
 
 function wait(ms: number) {
     return new Promise<void>(resolve => window.setTimeout(resolve, ms));
+}
+
+function getSettingsTabEntryKey(plugin: Plugin) {
+    return plugin.settingsTab?.route.replace(/_panel$/, "") ?? null;
+}
+
+function syncRegisteredSettingsTab(plugin: Plugin, enabled: boolean) {
+    const entryKey = getSettingsTabEntryKey(plugin);
+    if (!entryKey) return;
+
+    if (!enabled) {
+        while (SettingsPlugin.customEntries.some(entry => entry.key === entryKey)) {
+            removeFromArray(SettingsPlugin.customEntries, entry => entry.key === entryKey);
+        }
+
+        while (SettingsPlugin.settingsSectionMap.some(entry => entry[1] === entryKey || entry[1] === plugin.settingsTab?.route)) {
+            removeFromArray(SettingsPlugin.settingsSectionMap, entry => entry[1] === entryKey || entry[1] === plugin.settingsTab?.route);
+        }
+    }
+
+    SettingsPlugin.invalidateSectionLayout();
+}
+
+function syncLiveSettingsTabVisibility(plugin: Plugin, enabled: boolean) {
+    const title = plugin.settingsTab?.title?.trim();
+    if (!title) return;
+
+    const selectors = "button, a, [role='button'], [role='tab']";
+    const elements = [...document.querySelectorAll<HTMLElement>(selectors)];
+
+    for (const element of elements) {
+        const text = element.innerText?.trim();
+        if (text !== title) continue;
+        if (!element.closest("[aria-modal='true']")) continue;
+
+        if (enabled) {
+            if (element.dataset.kamidereSettingsTabHidden === "true") {
+                element.style.removeProperty("display");
+                delete element.dataset.kamidereSettingsTabHidden;
+            }
+        } else {
+            element.style.display = "none";
+            element.dataset.kamidereSettingsTabHidden = "true";
+        }
+    }
 }
 
 export function PluginCard({ plugin, disabled, onRestartNeeded, onMouseEnter, onMouseLeave, isNew }: PluginCardProps) {
@@ -125,6 +172,7 @@ export function PluginCard({ plugin, disabled, onRestartNeeded, onMouseEnter, on
 
     function toggleEnabled() {
         const wasEnabled = isEnabled();
+        const nextEnabled = !wasEnabled;
 
         // If we're enabling a plugin, make sure all deps are enabled recursively.
         if (!wasEnabled) {
@@ -146,14 +194,21 @@ export function PluginCard({ plugin, disabled, onRestartNeeded, onMouseEnter, on
 
         // if the plugin requires a restart, don't use stopPlugin/startPlugin. Wait for restart to apply changes.
         if (pluginRequiresRestart(plugin)) {
-            settings.enabled = !wasEnabled;
+            settings.enabled = nextEnabled;
             onRestartNeeded(plugin.name, "enabled");
             return;
         }
 
         // If the plugin is enabled, but hasn't been started, then we can just toggle it off.
         if (wasEnabled && !plugin.started) {
-            settings.enabled = !wasEnabled;
+            settings.enabled = nextEnabled;
+
+            if (plugin.settingsTab) {
+                syncRegisteredSettingsTab(plugin, nextEnabled);
+                syncLiveSettingsTabVisibility(plugin, nextEnabled);
+                void refreshPluginSettingsView();
+                showSettingsTabStatus(nextEnabled);
+            }
             return;
         }
 
@@ -170,11 +225,13 @@ export function PluginCard({ plugin, disabled, onRestartNeeded, onMouseEnter, on
             return;
         }
 
-        settings.enabled = !wasEnabled;
+        settings.enabled = nextEnabled;
 
         if (plugin.settingsTab) {
+            syncRegisteredSettingsTab(plugin, nextEnabled);
+            syncLiveSettingsTabVisibility(plugin, nextEnabled);
             void refreshPluginSettingsView();
-            showSettingsTabStatus(!wasEnabled);
+            showSettingsTabStatus(nextEnabled);
         }
     }
 
