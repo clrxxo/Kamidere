@@ -249,15 +249,17 @@
 }
 
 .vc-send-trail-action-button-purge {
-    min-width: 148px;
+    min-width: 176px;
+    min-height: 36px;
+    padding-inline: 16px;
     box-shadow: 0 10px 22px rgb(237 66 69 / 18%), inset 0 1px 0 rgb(255 255 255 / 6%);
 }
 
 .vc-send-trail-action-icon-button {
-    width: 34px;
-    height: 34px;
+    width: 36px;
+    height: 36px;
     border-radius: 8px;
-    flex: 0 0 34px;
+    flex: 0 0 36px;
 }
 
 .vc-send-trail-action-button-count {
@@ -392,6 +394,13 @@
 
 .vc-send-trail-history-action-cluster .vc-send-trail-action-button {
     justify-content: space-between;
+}
+
+.vc-send-trail-history-actions-row {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 14px;
 }
 
 .vc-send-trail-history-list {
@@ -935,6 +944,11 @@
     .vc-send-trail-history-action-cluster {
         flex: 1 1 auto;
         width: 100%;
+        justify-content: flex-start;
+        flex-wrap: wrap;
+    }
+
+    .vc-send-trail-history-actions-row {
         justify-content: flex-start;
         flex-wrap: wrap;
     }

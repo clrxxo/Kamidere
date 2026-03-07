@@ -81,8 +81,6 @@ interface DmConversation {
     count: number;
 }
 
-type MetricChipTone = "default" | "accent" | "protected";
-
 function showToast(message: string, type: any) {
     Toasts.show({
         message,
@@ -103,38 +101,6 @@ function makeEmptyPurgeStatus(): PurgeStatusState {
         failed: 0,
         skipped: 0,
     };
-}
-
-function MetricChip({
-    value,
-    label,
-    tone = "default",
-    active = false,
-    onClick,
-}: {
-    value: number;
-    label: string;
-    tone?: MetricChipTone;
-    active?: boolean;
-    onClick?: () => void;
-}) {
-    const Tag = onClick ? "button" : "span";
-
-    return (
-        <Tag
-            {...(onClick ? { type: "button", onClick, title: "Clear selection" } : {})}
-            className={cl(
-                "history-chip",
-                tone !== "default" && `history-chip-${tone}`,
-                onClick && "history-chip-button",
-            )}
-        >
-            <span className={cl("history-chip-value")}>{value}</span>
-            <span className={cl("history-chip-label")}>{label}</span>
-            {active && <span className={cl("history-chip-indicator")} />}
-            {onClick && <span className={cl("history-chip-action")}>Clear</span>}
-        </Tag>
-    );
 }
 
 function shouldIgnoreRecordToggle(target: HTMLElement | null) {
@@ -798,8 +764,6 @@ function SendTrailTab() {
         [protectedDmChannels, purgeActionRecords, purgeConfig.protectAllDms, purgeTarget],
     );
 
-    const allVisibleSelected = pagedRecords.length > 0 && pagedRecords.every(record => selectedIds.has(record.id));
-    const protectedPurgeCount = purgeActionRecords.length - purgeActionEligibleRecords.length;
     const dmConversationCount = React.useMemo(() => buildDmConversations(records).length, [records]);
     const isBusy = purgeStatus.phase === "running";
     const scopeLabel = scopeOptions.find(option => option.value === scope)?.label ?? "All destinations";
@@ -808,24 +772,6 @@ function SendTrailTab() {
     const pageRangeStart = filteredRecords.length === 0 ? 0 : pageStartIndex + 1;
     const pageRangeEnd = filteredRecords.length === 0 ? 0 : Math.min(filteredRecords.length, pageStartIndex + pageSizeNumber);
     const purgeActionLabel = selectedRecords.length > 0 ? "Purge Selected" : "Purge All";
-
-    const toggleVisibleSelection = React.useCallback(() => {
-        setSelectedIds(current => {
-            const next = new Set(current);
-
-            if (pagedRecords.length === 0) return next;
-
-            if (pagedRecords.every(record => next.has(record.id))) {
-                for (const record of pagedRecords) next.delete(record.id);
-            } else {
-                for (const record of pagedRecords) next.add(record.id);
-            }
-
-            return next;
-        });
-    }, [pagedRecords]);
-
-    const clearSelection = React.useCallback(() => setSelectedIds(new Set()), []);
 
     const changePage = React.useCallback((nextPage: number) => {
         keepFooterVisibleRef.current = true;
@@ -1092,51 +1038,30 @@ function SendTrailTab() {
                         </div>
                     </div>
 
-                    <div className={cl("history-controls-row")}>
-                        <div className={cl("history-chip-row")}>
-                            <MetricChip value={pagedRecords.length} label="on page" />
-                            <MetricChip value={filteredRecords.length} label="matching" active={filteredRecords.length > 0} />
-                            <MetricChip value={selectedRecords.length} label="selected" onClick={selectedRecords.length > 0 ? clearSelection : undefined} />
-                            <MetricChip value={purgeActionEligibleRecords.length} label="eligible" tone="accent" />
-                            {!!protectedPurgeCount && (
-                                <MetricChip value={protectedPurgeCount} label="protected" tone="protected" />
-                            )}
-                        </div>
+                </div>
 
-                        <div className={cl("toolbar-actions", "history-action-cluster")}>
-                            <Button
-                                size="xs"
-                                variant="secondary"
-                                className={cl("action-button", "action-button-select")}
-                                disabled={pagedRecords.length === 0 || isBusy}
-                                onClick={toggleVisibleSelection}
-                            >
-                                <span>{allVisibleSelected ? "Unselect Visible" : "Select Visible"}</span>
-                                <span className={cl("action-button-count")}>{pagedRecords.length}</span>
-                            </Button>
-                            <Button
-                                size="iconOnly"
-                                variant="secondary"
-                                className={cl("action-icon-button")}
-                                disabled={isBusy}
-                                onClick={openConfigModal}
-                                title="Open purge config"
-                                aria-label="Open purge config"
-                            >
-                                <CogWheel width={16} height={16} />
-                            </Button>
-                            <Button
-                                size="xs"
-                                variant="dangerPrimary"
-                                className={cl("action-button", "action-button-purge")}
-                                disabled={purgeActionRecords.length === 0 || isBusy}
-                                onClick={confirmPurge}
-                            >
-                                <DeleteIcon width={13} height={13} />
-                                <span>{purgeActionLabel}</span>
-                            </Button>
-                        </div>
-                    </div>
+                <div className={cl("history-actions-row")}>
+                    <Button
+                        size="iconOnly"
+                        variant="secondary"
+                        className={cl("action-icon-button")}
+                        disabled={isBusy}
+                        onClick={openConfigModal}
+                        title="Open purge config"
+                        aria-label="Open purge config"
+                    >
+                        <CogWheel width={16} height={16} />
+                    </Button>
+                    <Button
+                        size="xs"
+                        variant="dangerPrimary"
+                        className={cl("action-button", "action-button-purge")}
+                        disabled={purgeActionRecords.length === 0 || isBusy}
+                        onClick={confirmPurge}
+                    >
+                        <DeleteIcon width={13} height={13} />
+                        <span>{purgeActionLabel}</span>
+                    </Button>
                 </div>
 
                 <div
