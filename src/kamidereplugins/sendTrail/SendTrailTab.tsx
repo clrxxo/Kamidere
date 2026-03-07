@@ -467,6 +467,23 @@ function PaginationNavButton({
     );
 }
 
+function getScrollContainer(node: HTMLElement | null): HTMLElement | Window {
+    let current = node?.parentElement ?? null;
+
+    while (current) {
+        const style = window.getComputedStyle(current);
+        const overflowY = style.overflowY;
+
+        if ((overflowY === "auto" || overflowY === "scroll" || overflowY === "overlay") && current.scrollHeight > current.clientHeight) {
+            return current;
+        }
+
+        current = current.parentElement;
+    }
+
+    return window;
+}
+
 function SendTrailTab() {
     const currentUserId = useStateFromStores([UserStore], () => UserStore.getCurrentUser()?.id ?? null);
     const [records, pending] = useSentTrailRecords(currentUserId);
@@ -658,10 +675,32 @@ function SendTrailTab() {
         if (!footer) return;
 
         window.requestAnimationFrame(() => {
-            footer.scrollIntoView({
-                behavior: "smooth",
-                block: "end",
-            });
+            const scrollContainer = getScrollContainer(footer);
+            const margin = 20;
+
+            if (scrollContainer === window) {
+                const rect = footer.getBoundingClientRect();
+                const overflow = rect.bottom - (window.innerHeight - margin);
+                if (overflow > 0) {
+                    window.scrollBy({
+                        top: overflow,
+                        behavior: "smooth",
+                    });
+                }
+                return;
+            }
+
+            const container = scrollContainer as HTMLElement;
+            const footerRect = footer.getBoundingClientRect();
+            const containerRect = container.getBoundingClientRect();
+            const overflow = footerRect.bottom - (containerRect.bottom - margin);
+
+            if (overflow > 0) {
+                container.scrollBy({
+                    top: overflow,
+                    behavior: "smooth",
+                });
+            }
         });
     }, [currentPage, pageSize]);
 
@@ -1153,20 +1192,15 @@ function SendTrailTab() {
 
                         <div className={cl("pagination-page-size")}>
                             <span className={cl("pagination-page-size-label")}>Rows per page:</span>
-                            <label className={cl("pagination-page-size-select")}>
-                                <select
-                                    className={cl("pagination-page-size-native")}
-                                    value={pageSize}
-                                    disabled={isBusy || filteredRecords.length === 0}
-                                    onChange={event => changePageSize(event.currentTarget.value as PageSizeValue)}
-                                >
-                                    {pageSizeOptions.map(option => (
-                                        <option key={option.value} value={option.value}>
-                                            {option.label}
-                                        </option>
-                                    ))}
-                                </select>
-                            </label>
+                            <div className={cl("pagination-page-size-select")}>
+                                <Select
+                                    options={pageSizeOptions}
+                                    select={changePageSize}
+                                    isSelected={(value: PageSizeValue) => pageSize === value}
+                                    serialize={(value: PageSizeValue) => value}
+                                    isDisabled={isBusy || filteredRecords.length === 0}
+                                />
+                            </div>
                         </div>
                     </div>
 
