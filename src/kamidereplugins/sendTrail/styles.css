@@ -93,7 +93,7 @@
 
 .vc-send-trail-toolbar-topline {
     align-items: flex-start;
-    margin-bottom: 0;
+    margin-bottom: 12px;
 }
 
 .vc-send-trail-toolbar-actions {
@@ -108,7 +108,7 @@
     display: flex;
     flex: 1 1 auto;
     flex-direction: column;
-    gap: 4px;
+    gap: 3px;
 }
 
 .vc-send-trail-history-summary {
@@ -126,9 +126,27 @@
     display: grid;
     gap: 12px;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    margin-top: 14px;
-    padding-top: 14px;
-    border-top: 1px solid var(--vc-send-trail-border);
+}
+
+.vc-send-trail-filter-panel {
+    padding: 14px;
+    border: 1px solid var(--vc-send-trail-border);
+    border-radius: 10px;
+    background: color-mix(in oklab, var(--background-secondary) 96%, #fff 4%);
+}
+
+.vc-send-trail-filter-panel-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.vc-send-trail-filter-panel-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
 }
 
 .vc-send-trail-toolbar-field {
@@ -453,6 +471,7 @@
 @media (max-width: 760px) {
     .vc-send-trail-toolbar-topline,
     .vc-send-trail-toolbar-footer,
+    .vc-send-trail-filter-panel-header,
     .vc-send-trail-group-header,
     .vc-send-trail-record-header,
     .vc-send-trail-purge-status,

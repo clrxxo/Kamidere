@@ -432,7 +432,6 @@ function SendTrailTab() {
     const [kind, setKind] = React.useState<KindValue>("all");
     const [period, setPeriod] = React.useState<PeriodValue>("all");
     const [query, setQuery] = React.useState("");
-    const [filtersExpanded, setFiltersExpanded] = React.useState(false);
     const [selectedIds, setSelectedIds] = React.useState<Set<string>>(() => new Set());
     const [deletingIds, setDeletingIds] = React.useState<Set<string>>(() => new Set());
     const [purgeStatus, setPurgeStatus] = React.useState<PurgeStatusState>(makeEmptyPurgeStatus);
@@ -768,15 +767,9 @@ function SendTrailTab() {
                             {filteredRecords.length} visible / {selectedRecords.length} selected / {selectedEligibleRecords.length} eligible
                             {!!protectedSelectedCount && ` / ${protectedSelectedCount} protected`}
                         </Paragraph>
-                        <Paragraph className={cl("history-summary")}>
-                            {scopeLabel} / {kindLabel} / {periodLabel}
-                        </Paragraph>
                     </div>
 
                     <div className={cl("toolbar-actions")}>
-                        <Button size="xs" variant="secondary" disabled={isBusy} onClick={() => setFiltersExpanded(current => !current)}>
-                            {filtersExpanded ? "Hide Filters" : "Filters"}
-                        </Button>
                         <Button size="xs" variant="secondary" disabled={filteredRecords.length === 0 || isBusy} onClick={toggleVisibleSelection}>
                             {allVisibleSelected ? "Unselect Visible" : "Select Visible"}
                         </Button>
@@ -796,7 +789,16 @@ function SendTrailTab() {
                     </div>
                 </div>
 
-                {filtersExpanded && (
+                <div className={cl("filter-panel")}>
+                    <div className={cl("filter-panel-header")}>
+                        <div className={cl("filter-panel-copy")}>
+                            <BaseText size="md" weight="semibold">Advanced Filter</BaseText>
+                            <Paragraph className={cl("history-summary")}>
+                                {scopeLabel} / {kindLabel} / {periodLabel}
+                            </Paragraph>
+                        </div>
+                    </div>
+
                     <div className={cl("toolbar-grid")}>
                         <div className={cl("toolbar-field")}>
                             <Paragraph className={cl("field-label")}>Destination</Paragraph>
@@ -841,7 +843,7 @@ function SendTrailTab() {
                             />
                         </div>
                     </div>
-                )}
+                </div>
 
                 <div className={cl("toolbar-footer")}>
                     <Paragraph className={cl("history-summary")}>
