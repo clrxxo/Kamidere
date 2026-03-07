@@ -9,7 +9,7 @@ import { ChannelStore, GuildStore, MessageStore, UserStore } from "@webpack/comm
 
 import SendTrailTab from "./SendTrailTab";
 import { settings } from "./settings";
-import { appendSentTrailRecord, mergeSentTrailRecordMedia, removeSentTrailRecord } from "./store";
+import { appendSentTrailRecord, hasSentTrailRecord, mergeSentTrailRecordMedia, removeSentTrailRecord } from "./store";
 import type { MessageCreatePayload, MessageDeletePayload, MessageUpdatePayload, PendingSendDraft, SentTrailRecord } from "./types";
 import { buildJumpLink, collectMessageMediaItems, getChannelRecipientIds, getMessageDisplayContent, getMessageTimestamp, getRecordPreview, hasMediaLinks, isForwardedMessage, makeAttachmentSignature, makeUploadSignature, normalizeContent } from "./utils";
 
@@ -170,6 +170,28 @@ async function maybeEnrichRecord(payload: MessageUpdatePayload) {
     );
 }
 
+async function maybeCreateRecordFromUpdate(payload: MessageUpdatePayload) {
+    const currentUserId = UserStore.getCurrentUser()?.id;
+    if (!currentUserId) return;
+
+    const cachedMessage = MessageStore.getMessage(payload.message.channel_id, payload.message.id);
+    const message = cachedMessage ?? payload.message;
+
+    if (!message?.author || message.author.id !== currentUserId) return;
+    if (!isForwardedMessage(message)) return;
+    if (hasSentTrailRecord(currentUserId, message.channel_id, message.id)) return;
+
+    const record = buildRecord({
+        type: "MESSAGE_CREATE",
+        optimistic: false,
+        channelId: message.channel_id,
+        guildId: payload.guildId,
+        message: message as MessageCreatePayload["message"],
+    }, null);
+
+    await appendSentTrailRecord(record);
+}
+
 async function enrichFromStore(channelId: string, messageId: string, guildId?: string) {
     const message = MessageStore.getMessage(channelId, messageId);
     if (!message) return false;
@@ -279,6 +301,7 @@ export default definePlugin({
 
         async MESSAGE_UPDATE(payload: MessageUpdatePayload) {
             cleanupExpiredDrafts();
+            await maybeCreateRecordFromUpdate(payload);
             await maybeEnrichRecord(payload);
         },
 

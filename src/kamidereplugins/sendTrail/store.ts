@@ -18,6 +18,14 @@ function setCachedRecords(userId: string | null, records: SentTrailRecord[]) {
     recordCache.set(userId, records);
 }
 
+export function hasSentTrailRecord(userId: string | null, channelId: string, messageId: string) {
+    if (!userId) return false;
+    return getCachedRecords(userId).some(record =>
+        record.channelId === channelId &&
+        record.messageId === messageId,
+    );
+}
+
 function emit() {
     signals.forEach(signal => signal());
 }
