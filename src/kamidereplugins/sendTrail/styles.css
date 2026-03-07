@@ -817,7 +817,6 @@
 
 .vc-send-trail-record-footer {
     padding-top: 2px;
-    border-top: 1px solid rgb(255 255 255 / 6%);
 }
 
 .vc-send-trail-record-time {
@@ -842,6 +841,25 @@
     white-space: pre-wrap;
     word-break: break-word;
     color: var(--text-normal);
+}
+
+.vc-send-trail-record-message-shell {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px 14px;
+    border: 1px solid rgb(255 255 255 / 6%);
+    border-radius: 8px;
+    background: color-mix(in oklab, var(--background-primary) 58%, var(--background-secondary) 42%);
+    box-shadow: inset 3px 0 0 rgb(244 189 106 / 20%);
+}
+
+.vc-send-trail-record-message-label {
+    color: var(--text-muted);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
 }
 
 .vc-send-trail-preview-grid {

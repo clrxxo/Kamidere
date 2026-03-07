@@ -708,7 +708,10 @@ function RecordCard({
             </div>
 
             {record.hasText ? (
-                <Paragraph className={cl("record-content")}>{record.preview || record.content}</Paragraph>
+                <div className={cl("record-message-shell")}>
+                    <span className={cl("record-message-label")}>Sent Message</span>
+                    <Paragraph className={cl("record-content")}>{record.preview || record.content}</Paragraph>
+                </div>
             ) : (
                 <Paragraph className={cl("record-muted")}>
                     This entry is media-only. Use the preview below to inspect what was sent.
