@@ -81,6 +81,8 @@ interface DmConversation {
     count: number;
 }
 
+type MetricChipTone = "default" | "accent" | "protected";
+
 function showToast(message: string, type: any) {
     Toasts.show({
         message,
@@ -101,6 +103,42 @@ function makeEmptyPurgeStatus(): PurgeStatusState {
         failed: 0,
         skipped: 0,
     };
+}
+
+function MetricChip({
+    value,
+    label,
+    tone = "default",
+    active = false,
+    onClick,
+}: {
+    value: number;
+    label: string;
+    tone?: MetricChipTone;
+    active?: boolean;
+    onClick?: () => void;
+}) {
+    const Tag = onClick ? "button" : "span";
+
+    return (
+        <Tag
+            {...(onClick ? { type: "button", onClick, title: "Clear selection" } : {})}
+            className={cl(
+                "history-chip",
+                tone !== "default" && `history-chip-${tone}`,
+                onClick && "history-chip-button",
+            )}
+        >
+            <span className={cl("history-chip-value")}>{value}</span>
+            <span className={cl("history-chip-label")}>{label}</span>
+            {active && <span className={cl("history-chip-indicator")} />}
+            {onClick && <span className={cl("history-chip-action")}>Clear</span>}
+        </Tag>
+    );
+}
+
+function shouldIgnoreRecordToggle(target: HTMLElement | null) {
+    return !!target?.closest("[data-send-trail-action='true'], button, a, input, textarea, select");
 }
 
 function isDirectMessageRecord(record: SentTrailRecord) {
@@ -166,12 +204,9 @@ function MediaPreview({ media }: { media: SentTrailMediaItem[]; }) {
     return (
         <div className={cl("preview-grid")}>
             {media.map(item => (
-                <a
+                <div
                     key={`${item.source}:${item.kind}:${item.url}`}
                     className={cl("preview-card")}
-                    href={item.url}
-                    target="_blank"
-                    rel="noreferrer"
                 >
                     {item.kind === "image" ? (
                         <img
@@ -184,7 +219,9 @@ function MediaPreview({ media }: { media: SentTrailMediaItem[]; }) {
                         <video
                             className={cl("preview-video")}
                             src={item.url}
-                            controls
+                            autoPlay
+                            loop
+                            muted
                             preload="metadata"
                             playsInline
                         />
@@ -192,7 +229,7 @@ function MediaPreview({ media }: { media: SentTrailMediaItem[]; }) {
                     <span className={cl("preview-caption")}>
                         {item.filename ?? (item.kind === "image" ? "Image" : "Video")}
                     </span>
-                </a>
+                </div>
             ))}
         </div>
     );
@@ -213,7 +250,7 @@ function PurgeStatusBanner({ status }: { status: PurgeStatusState; }) {
         title = `Purging ${status.processed}/${status.total}`;
         subtitle = status.currentLabel
             ? `Deleting ${status.currentLabel} one message at a time.`
-            : "Deleting selected messages one by one to keep the pace safe.";
+            : "Deleting queued messages one by one to keep the pace safe.";
     } else if (isSuccess) {
         title = "Purge complete";
         subtitle = `Deleted ${status.deleted} message${status.deleted === 1 ? "" : "s"}${status.skipped ? ` and skipped ${status.skipped} protected entr${status.skipped === 1 ? "y" : "ies"}` : ""}.`;
@@ -286,7 +323,7 @@ function SendTrailConfigModal({
 
             <ModalContent className={cl("config-modal")}>
                 <Paragraph className={cl("config-copy")}>
-                    These rules decide what the `Purge Selected` action is allowed to delete. Protected direct messages stay in Send Trail until you change the config.
+                    These rules decide what the `Purge` action is allowed to delete. Protected direct messages stay in Send Trail until you change the config.
                 </Paragraph>
 
                 <div className={cl("config-grid")}>
@@ -367,9 +404,29 @@ function RecordCard({
     onToggleSelected(): void;
 }) {
     const context = resolveRecordContext(record);
+    const handleCardClick = React.useCallback((event: React.MouseEvent<HTMLDivElement>) => {
+        if (deleting || shouldIgnoreRecordToggle(event.target as HTMLElement)) return;
+        onToggleSelected();
+    }, [deleting, onToggleSelected]);
+
+    const handleCardKeyDown = React.useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
+        if (deleting) return;
+        if (event.key !== "Enter" && event.key !== " ") return;
+        if (shouldIgnoreRecordToggle(event.target as HTMLElement)) return;
+        event.preventDefault();
+        onToggleSelected();
+    }, [deleting, onToggleSelected]);
 
     return (
-        <Card className={cl("record-card")} defaultPadding>
+        <Card
+            className={cl("record-card", selected && "record-card-selected", deleting && "record-card-deleting")}
+            defaultPadding
+            role="button"
+            tabIndex={deleting ? -1 : 0}
+            aria-pressed={selected}
+            onClick={handleCardClick}
+            onKeyDown={handleCardKeyDown}
+        >
             <div className={cl("record-header")}>
                 <div className={cl("record-meta")}>
                     <div className={cl("record-origin-line")}>
@@ -382,6 +439,9 @@ function RecordCard({
                         </span>
                         {protectedFromPurge && (
                             <span className={cl("record-flag")}>Protected</span>
+                        )}
+                        {selected && (
+                            <span className={cl("record-flag", "record-flag-selected")}>Selected</span>
                         )}
                     </div>
 
@@ -405,19 +465,18 @@ function RecordCard({
                 <span className={cl("record-time")}>{formatTime(record.timestamp)}</span>
 
                 <div className={cl("record-buttons")}>
-                    <TextButton variant="secondary" className={cl("record-open-button")} onClick={() => NavigationRouter.transitionTo(record.jumpLink)}>
+                    <TextButton
+                        variant="secondary"
+                        className={cl("record-open-button")}
+                        data-send-trail-action="true"
+                        onClick={event => {
+                            event.stopPropagation();
+                            NavigationRouter.transitionTo(record.jumpLink);
+                        }}
+                    >
                         <OpenExternalIcon className={cl("record-open-icon")} width={14} height={14} />
                         <span>Open Message</span>
                     </TextButton>
-                    <Button
-                        size="small"
-                        variant={selected ? "primary" : "secondary"}
-                        className={cl("record-select-button", selected ? "record-select-button-selected" : "record-select-button-idle")}
-                        disabled={deleting}
-                        onClick={onToggleSelected}
-                    >
-                        {deleting ? "Deleting..." : selected ? "Selected" : "Select"}
-                    </Button>
                 </div>
             </div>
         </Card>
@@ -730,13 +789,17 @@ function SendTrailTab() {
         [records, selectedIds],
     );
 
-    const selectedEligibleRecords = React.useMemo(
-        () => selectedRecords.filter(record => !isRecordProtected(record, purgeTarget, purgeConfig.protectAllDms, protectedDmChannels)),
-        [protectedDmChannels, purgeConfig.protectAllDms, purgeTarget, selectedRecords],
+    const purgeActionRecords = React.useMemo(
+        () => selectedRecords.length > 0 ? selectedRecords : filteredRecords,
+        [filteredRecords, selectedRecords],
+    );
+    const purgeActionEligibleRecords = React.useMemo(
+        () => purgeActionRecords.filter(record => !isRecordProtected(record, purgeTarget, purgeConfig.protectAllDms, protectedDmChannels)),
+        [protectedDmChannels, purgeActionRecords, purgeConfig.protectAllDms, purgeTarget],
     );
 
     const allVisibleSelected = pagedRecords.length > 0 && pagedRecords.every(record => selectedIds.has(record.id));
-    const protectedSelectedCount = selectedRecords.length - selectedEligibleRecords.length;
+    const protectedPurgeCount = purgeActionRecords.length - purgeActionEligibleRecords.length;
     const dmConversationCount = React.useMemo(() => buildDmConversations(records).length, [records]);
     const isBusy = purgeStatus.phase === "running";
     const scopeLabel = scopeOptions.find(option => option.value === scope)?.label ?? "All destinations";
@@ -744,6 +807,7 @@ function SendTrailTab() {
     const periodLabel = periodOptions.find(option => option.value === period)?.label ?? "All time";
     const pageRangeStart = filteredRecords.length === 0 ? 0 : pageStartIndex + 1;
     const pageRangeEnd = filteredRecords.length === 0 ? 0 : Math.min(filteredRecords.length, pageStartIndex + pageSizeNumber);
+    const purgeActionLabel = selectedRecords.length > 0 ? "Purge Selected" : "Purge All";
 
     const toggleVisibleSelection = React.useCallback(() => {
         setSelectedIds(current => {
@@ -815,7 +879,7 @@ function SendTrailTab() {
                 skipped,
                 currentLabel: undefined,
             });
-            showToast("Nothing in the current selection is allowed by your purge config.", Toasts.Type.FAILURE);
+            showToast("Nothing in the current purge target is allowed by your purge config.", Toasts.Type.FAILURE);
             return;
         }
 
@@ -895,23 +959,25 @@ function SendTrailTab() {
     }, [currentUserId, protectedDmChannels, purgeConfig.protectAllDms, purgeTarget, updateDeletingId]);
 
     const confirmPurge = React.useCallback(() => {
-        if (selectedRecords.length === 0) return;
+        if (purgeActionRecords.length === 0) return;
 
-        const eligibleCount = selectedEligibleRecords.length;
-        const skippedCount = selectedRecords.length - eligibleCount;
+        const isSelectionPurge = selectedRecords.length > 0;
+        const eligibleCount = purgeActionEligibleRecords.length;
+        const skippedCount = purgeActionRecords.length - eligibleCount;
+        const targetLabel = isSelectionPurge ? "selected" : "matching";
 
         Alerts.show({
-            title: `Purge ${selectedRecords.length} selected message${selectedRecords.length === 1 ? "" : "s"}?`,
+            title: `Purge ${purgeActionRecords.length} ${targetLabel} message${purgeActionRecords.length === 1 ? "" : "s"}?`,
             body: eligibleCount === 0
-                ? "Everything selected is currently protected by your purge config."
-                : `Send Trail will delete ${eligibleCount} selected message${eligibleCount === 1 ? "" : "s"} from Discord one by one.${skippedCount ? ` ${skippedCount} selected entr${skippedCount === 1 ? "y is" : "ies are"} protected by config and will be skipped.` : ""}`,
+                ? "Everything in the current purge target is currently protected by your purge config."
+                : `Send Trail will delete ${eligibleCount} ${targetLabel} message${eligibleCount === 1 ? "" : "s"} from Discord one by one.${skippedCount ? ` ${skippedCount} ${targetLabel} entr${skippedCount === 1 ? "y is" : "ies are"} protected by config and will be skipped.` : ""}`,
             confirmText: "Start Purge",
             cancelText: "Cancel",
             async onConfirm() {
-                await runPurge(selectedRecords);
+                await runPurge(purgeActionRecords);
             },
         });
-    }, [runPurge, selectedEligibleRecords.length, selectedRecords]);
+    }, [purgeActionEligibleRecords.length, purgeActionRecords, runPurge, selectedRecords.length]);
 
     const confirmLocalClear = React.useCallback(() => {
         Alerts.show({
@@ -946,7 +1012,7 @@ function SendTrailTab() {
             </SpecialCard>
 
             <Notice.Info className={Margins.top20} style={{ width: "100%" }}>
-                Send Trail is local to this device. `Purge Selected` deletes the real Discord messages one by one, while `Clear Local History` only removes the saved index shown here.
+                Send Trail is local to this device. `Purge` deletes the real Discord messages one by one, while `Clear Local History` only removes the saved index shown here.
             </Notice.Info>
 
             <Heading className={Margins.top20}>History</Heading>
@@ -973,17 +1039,6 @@ function SendTrailTab() {
                             </Paragraph>
                         </div>
 
-                        <Button
-                            size="iconOnly"
-                            variant="secondary"
-                            className={cl("action-icon-button")}
-                            disabled={isBusy}
-                            onClick={openConfigModal}
-                            title="Open purge config"
-                            aria-label="Open purge config"
-                        >
-                            <CogWheel width={16} height={16} />
-                        </Button>
                     </div>
 
                     <div className={cl("toolbar-grid")}>
@@ -1038,30 +1093,17 @@ function SendTrailTab() {
                     </div>
 
                     <div className={cl("history-controls-row")}>
-                        <div className={cl("history-controls-copy")}>
-                            <div className={cl("history-chip-row")}>
-                                <span className={cl("history-chip")}>{pagedRecords.length} on page</span>
-                                <span className={cl("history-chip")}>{filteredRecords.length} matching</span>
-                                <span className={cl("history-chip")}>{selectedRecords.length} selected</span>
-                                <span className={cl("history-chip", "accent")}>{selectedEligibleRecords.length} eligible</span>
-                                {!!protectedSelectedCount && (
-                                    <span className={cl("history-chip", "protected")}>{protectedSelectedCount} protected</span>
-                                )}
-                            </div>
-
-                            {selectedRecords.length > 0 && (
-                                <TextButton
-                                    variant="secondary"
-                                    className={cl("toolbar-clear")}
-                                    disabled={isBusy}
-                                    onClick={clearSelection}
-                                >
-                                    Clear Selection
-                                </TextButton>
+                        <div className={cl("history-chip-row")}>
+                            <MetricChip value={pagedRecords.length} label="on page" />
+                            <MetricChip value={filteredRecords.length} label="matching" active={filteredRecords.length > 0} />
+                            <MetricChip value={selectedRecords.length} label="selected" onClick={selectedRecords.length > 0 ? clearSelection : undefined} />
+                            <MetricChip value={purgeActionEligibleRecords.length} label="eligible" tone="accent" />
+                            {!!protectedPurgeCount && (
+                                <MetricChip value={protectedPurgeCount} label="protected" tone="protected" />
                             )}
                         </div>
 
-                        <div className={cl("toolbar-actions", "toolbar-actions-stack")}>
+                        <div className={cl("toolbar-actions", "history-action-cluster")}>
                             <Button
                                 size="xs"
                                 variant="secondary"
@@ -1073,14 +1115,25 @@ function SendTrailTab() {
                                 <span className={cl("action-button-count")}>{pagedRecords.length}</span>
                             </Button>
                             <Button
+                                size="iconOnly"
+                                variant="secondary"
+                                className={cl("action-icon-button")}
+                                disabled={isBusy}
+                                onClick={openConfigModal}
+                                title="Open purge config"
+                                aria-label="Open purge config"
+                            >
+                                <CogWheel width={16} height={16} />
+                            </Button>
+                            <Button
                                 size="xs"
                                 variant="dangerPrimary"
                                 className={cl("action-button", "action-button-purge")}
-                                disabled={selectedRecords.length === 0 || isBusy}
+                                disabled={purgeActionRecords.length === 0 || isBusy}
                                 onClick={confirmPurge}
                             >
                                 <DeleteIcon width={13} height={13} />
-                                <span>Purge Selected</span>
+                                <span>{purgeActionLabel}</span>
                             </Button>
                         </div>
                     </div>

@@ -140,6 +140,7 @@
     flex-wrap: wrap;
     gap: 10px;
     margin-bottom: 0;
+    flex: 1 1 auto;
 }
 
 .vc-send-trail-history-controls-copy,
@@ -164,14 +165,52 @@
 .vc-send-trail-history-chip {
     display: inline-flex;
     align-items: center;
-    min-height: 28px;
-    padding: 0 10px;
+    gap: 8px;
+    min-height: 32px;
+    padding: 0 12px;
     border: 1px solid rgb(255 255 255 / 8%);
     border-radius: 8px;
     background: rgb(255 255 255 / 5%);
     color: var(--header-primary);
     font-size: 0.82rem;
     font-weight: 600;
+}
+
+.vc-send-trail-history-chip-value {
+    font-weight: 700;
+}
+
+.vc-send-trail-history-chip-label {
+    color: var(--text-muted);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.vc-send-trail-history-chip-indicator {
+    width: 6px;
+    height: 6px;
+    border-radius: 999px;
+    background: #36d399;
+    box-shadow: 0 0 0 4px rgb(54 211 153 / 12%);
+}
+
+.vc-send-trail-history-chip-button {
+    cursor: pointer;
+    transition: border-color 160ms ease, background-color 160ms ease, transform 160ms ease;
+}
+
+.vc-send-trail-history-chip-button:hover {
+    border-color: rgb(255 255 255 / 14%);
+    background: rgb(255 255 255 / 7%);
+    transform: translateY(-1px);
+}
+
+.vc-send-trail-history-chip-action {
+    color: var(--text-link);
+    font-size: 0.72rem;
+    font-weight: 700;
 }
 
 .vc-send-trail-history-chip-accent {
@@ -210,7 +249,7 @@
 }
 
 .vc-send-trail-action-button-purge {
-    min-width: 136px;
+    min-width: 148px;
     box-shadow: 0 10px 22px rgb(237 66 69 / 18%), inset 0 1px 0 rgb(255 255 255 / 6%);
 }
 
@@ -337,19 +376,21 @@
 
 .vc-send-trail-history-controls-row {
     margin-top: 14px;
-    padding-top: 14px;
-    border-top: 1px solid rgb(255 255 255 / 6%);
-    align-items: flex-end;
+    padding: 12px;
+    border: 1px solid rgb(255 255 255 / 6%);
+    border-radius: 8px;
+    background: color-mix(in oklab, var(--background-primary) 46%, var(--background-secondary) 54%);
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
 }
 
-.vc-send-trail-toolbar-actions-stack {
-    flex-direction: column;
-    align-items: stretch;
-    width: 156px;
-    flex: 0 0 156px;
+.vc-send-trail-history-action-cluster {
+    flex: 0 0 auto;
+    gap: 10px;
 }
 
-.vc-send-trail-toolbar-actions-stack .vc-send-trail-action-button {
+.vc-send-trail-history-action-cluster .vc-send-trail-action-button {
     justify-content: space-between;
 }
 
@@ -670,12 +711,27 @@
     background: var(--vc-send-trail-record-surface);
     box-shadow: 0 10px 22px rgb(0 0 0 / 10%);
     transition: border-color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+    cursor: pointer;
 }
 
 .vc-send-trail-record-card:hover {
     border-color: color-mix(in oklab, var(--vc-send-trail-border) 74%, #c8d0dd 26%);
     transform: translateY(-1px);
     box-shadow: 0 14px 28px rgb(0 0 0 / 14%);
+}
+
+.vc-send-trail-record-card:focus-visible {
+    outline: 2px solid rgb(88 101 242 / 42%);
+    outline-offset: 2px;
+}
+
+.vc-send-trail-record-card-selected {
+    border-color: rgb(88 101 242 / 34%);
+    box-shadow: 0 14px 32px rgb(88 101 242 / 16%);
+}
+
+.vc-send-trail-record-card-deleting {
+    cursor: progress;
 }
 
 .vc-send-trail-record-meta {
@@ -717,6 +773,11 @@
     font-weight: 700;
 }
 
+.vc-send-trail-record-flag-selected {
+    border-color: rgb(88 101 242 / 24%);
+    background: rgb(88 101 242 / 14%);
+}
+
 .vc-send-trail-channel-name {
     font-size: 0.95rem;
     font-weight: 600;
@@ -747,21 +808,6 @@
 
 .vc-send-trail-record-open-icon {
     color: currentColor;
-}
-
-.vc-send-trail-record-select-button {
-    min-width: 84px;
-    min-height: 32px;
-    border-radius: 8px;
-    font-weight: 600;
-}
-
-.vc-send-trail-record-select-button-idle {
-    background: color-mix(in oklab, var(--background-primary) 54%, var(--background-secondary) 46%);
-}
-
-.vc-send-trail-record-select-button-selected {
-    box-shadow: 0 8px 20px rgb(88 101 242 / 18%);
 }
 
 .vc-send-trail-record-content {
@@ -886,9 +932,11 @@
         justify-content: flex-start;
     }
 
-    .vc-send-trail-toolbar-actions-stack {
+    .vc-send-trail-history-action-cluster {
         flex: 1 1 auto;
         width: 100%;
+        justify-content: flex-start;
+        flex-wrap: wrap;
     }
 
     .vc-send-trail-purge-status-title-row {
