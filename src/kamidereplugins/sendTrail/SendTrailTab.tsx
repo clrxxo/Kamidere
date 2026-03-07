@@ -758,14 +758,12 @@ function SendTrailTab() {
             </Notice.Info>
 
             <Heading className={Margins.top20}>History</Heading>
-
-            <Card className={cl("toolbar-card")} defaultPadding>
-                <div className={cl("toolbar-topline")}>
-                    <div className={cl("toolbar-summary")}>
+            <Card className={cl("history-shell")} defaultPadding>
+                <div className={cl("history-shell-header")}>
+                    <div className={cl("history-shell-copy")}>
                         <HeadingTertiary className={Margins.reset}>Sent Messages</HeadingTertiary>
-                        <Paragraph className={cl("history-summary")}>
-                            {filteredRecords.length} visible / {selectedRecords.length} selected / {selectedEligibleRecords.length} eligible
-                            {!!protectedSelectedCount && ` / ${protectedSelectedCount} protected`}
+                        <Paragraph className={cl("history-subtitle")}>
+                            Review your global send history, narrow it down, and purge the exact set you want.
                         </Paragraph>
                     </div>
 
@@ -789,7 +787,27 @@ function SendTrailTab() {
                     </div>
                 </div>
 
-                <div className={cl("filter-panel")}>
+                <div className={cl("history-chip-row")}>
+                    <span className={cl("history-chip")}>{filteredRecords.length} visible</span>
+                    <span className={cl("history-chip")}>{selectedRecords.length} selected</span>
+                    <span className={cl("history-chip", "accent")}>{selectedEligibleRecords.length} eligible</span>
+                    {!!protectedSelectedCount && (
+                        <span className={cl("history-chip", "protected")}>{protectedSelectedCount} protected</span>
+                    )}
+                </div>
+
+                <div className={cl("history-filter-surface")}>
+                    <div className={cl("history-filter-meta")}>
+                        <Paragraph className={cl("history-summary")}>
+                            {scopeLabel} / {kindLabel} / {periodLabel}
+                        </Paragraph>
+                        <Paragraph className={cl("history-summary")}>
+                            Purge target: {purgeTarget === "all" ? "everything" : purgeTarget === "dms" ? "DMs only" : "servers only"}
+                            {purgeConfig.protectAllDms ? " / all DMs protected" : ""}
+                            {protectedDmChannels.size ? ` / ${protectedDmChannels.size} DM thread${protectedDmChannels.size === 1 ? "" : "s"} protected` : ""}
+                        </Paragraph>
+                    </div>
+
                     <div className={cl("toolbar-grid")}>
                         <div className={cl("toolbar-field")}>
                             <Paragraph className={cl("field-label")}>Destination</Paragraph>
@@ -836,70 +854,70 @@ function SendTrailTab() {
                     </div>
                 </div>
 
-                <div className={cl("toolbar-footer")}>
+                <PurgeStatusBanner status={purgeStatus} />
+
+                <div className={cl("history-list")}>
+                    {pending && (
+                        <Card className={cl("empty-card")} defaultPadding>
+                            <LogIcon className={cl("empty-icon")} />
+                            <HeadingTertiary>Loading Send Trail history...</HeadingTertiary>
+                        </Card>
+                    )}
+
+                    {!pending && records.length === 0 && (
+                        <Card className={cl("empty-card")} defaultPadding>
+                            <LogIcon className={cl("empty-icon")} />
+                            <HeadingTertiary>No saved sends yet</HeadingTertiary>
+                            <Paragraph>
+                                Send a message, image, GIF, video, or direct media link from this client and it will start appearing here.
+                            </Paragraph>
+                        </Card>
+                    )}
+
+                    {!pending && records.length > 0 && filteredRecords.length === 0 && (
+                        <Card className={cl("empty-card")} defaultPadding>
+                            <LogIcon className={cl("empty-icon")} />
+                            <HeadingTertiary>No results match this view</HeadingTertiary>
+                            <Paragraph>
+                                Broaden the destination, type, period, or search query to bring more sent messages into view.
+                            </Paragraph>
+                        </Card>
+                    )}
+
+                    {groupedRecords.map(group => (
+                        <div key={group.label} className={cl("group")}>
+                            <div className={cl("group-header")}>
+                                <HeadingTertiary className={Margins.reset}>{group.label}</HeadingTertiary>
+                                <span className={cl("group-count")}>
+                                    {group.records.length} entr{group.records.length === 1 ? "y" : "ies"}
+                                </span>
+                            </div>
+
+                            <div className={cl("group-list")}>
+                                {group.records.map(record => (
+                                    <RecordCard
+                                        key={record.id}
+                                        record={record}
+                                        selected={selectedIds.has(record.id)}
+                                        deleting={deletingIds.has(record.id)}
+                                        protectedFromPurge={isRecordProtected(record, purgeTarget, purgeConfig.protectAllDms, protectedDmChannels)}
+                                        onToggleSelected={() => toggleRecordSelection(record.id)}
+                                    />
+                                ))}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+
+                <div className={cl("history-footer")}>
                     <Paragraph className={cl("history-summary")}>
-                        Purge target: {purgeTarget === "all" ? "everything" : purgeTarget === "dms" ? "DMs only" : "servers only"}
-                        {purgeConfig.protectAllDms ? " / all DMs protected" : ""}
-                        {protectedDmChannels.size ? ` / ${protectedDmChannels.size} DM thread${protectedDmChannels.size === 1 ? "" : "s"} protected` : ""}
+                        Local history stays on this device. Purge removes live Discord messages one by one.
                     </Paragraph>
                     <TextButton variant="secondary" disabled={records.length === 0 || isBusy} onClick={confirmLocalClear}>
                         Clear Local History
                     </TextButton>
                 </div>
             </Card>
-
-            <PurgeStatusBanner status={purgeStatus} />
-
-            {pending && (
-                <Card className={cl("empty-card")} defaultPadding>
-                    <LogIcon className={cl("empty-icon")} />
-                    <HeadingTertiary>Loading Send Trail history...</HeadingTertiary>
-                </Card>
-            )}
-
-            {!pending && records.length === 0 && (
-                <Card className={cl("empty-card")} defaultPadding>
-                    <LogIcon className={cl("empty-icon")} />
-                    <HeadingTertiary>No saved sends yet</HeadingTertiary>
-                    <Paragraph>
-                        Send a message, image, GIF, video, or direct media link from this client and it will start appearing here.
-                    </Paragraph>
-                </Card>
-            )}
-
-            {!pending && records.length > 0 && filteredRecords.length === 0 && (
-                <Card className={cl("empty-card")} defaultPadding>
-                    <LogIcon className={cl("empty-icon")} />
-                    <HeadingTertiary>No results match this view</HeadingTertiary>
-                    <Paragraph>
-                        Broaden the destination, type, period, or search query to bring more sent messages into view.
-                    </Paragraph>
-                </Card>
-            )}
-
-            {groupedRecords.map(group => (
-                <div key={group.label} className={cl("group")}>
-                    <div className={cl("group-header")}>
-                        <HeadingTertiary className={Margins.reset}>{group.label}</HeadingTertiary>
-                        <span className={cl("group-count")}>
-                            {group.records.length} entr{group.records.length === 1 ? "y" : "ies"}
-                        </span>
-                    </div>
-
-                    <div className={cl("group-list")}>
-                        {group.records.map(record => (
-                            <RecordCard
-                                key={record.id}
-                                record={record}
-                                selected={selectedIds.has(record.id)}
-                                deleting={deletingIds.has(record.id)}
-                                protectedFromPurge={isRecordProtected(record, purgeTarget, purgeConfig.protectAllDms, protectedDmChannels)}
-                                onToggleSelected={() => toggleRecordSelection(record.id)}
-                            />
-                        ))}
-                    </div>
-                </div>
-            ))}
         </SettingsTab>
     );
 }

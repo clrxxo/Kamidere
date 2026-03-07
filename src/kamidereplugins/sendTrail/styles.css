@@ -6,6 +6,13 @@
     --vc-send-trail-border: color-mix(in oklab, var(--border-subtle) 82%, #000 18%);
     --vc-send-trail-surface: color-mix(in oklab, var(--background-secondary) 92%, #000 8%);
     --vc-send-trail-surface-alt: color-mix(in oklab, var(--background-secondary) 82%, #0c1016 18%);
+    --vc-send-trail-shell: linear-gradient(
+        180deg,
+        color-mix(in oklab, var(--background-secondary) 76%, #7d8798 24%),
+        color-mix(in oklab, var(--background-primary) 42%, var(--background-secondary) 58%)
+    );
+    --vc-send-trail-shell-panel: color-mix(in oklab, var(--background-secondary) 86%, #9aa4b3 14%);
+    --vc-send-trail-record-surface: color-mix(in oklab, var(--background-primary) 52%, var(--background-secondary) 48%);
 }
 
 .vc-send-trail-hero-metrics,
@@ -66,7 +73,7 @@
     background: rgb(114 137 218 / 14%);
 }
 
-.vc-send-trail-toolbar-card,
+.vc-send-trail-history-shell,
 .vc-send-trail-record-card,
 .vc-send-trail-empty-card,
 .vc-send-trail-config-empty,
@@ -77,8 +84,8 @@
     border-radius: 8px;
 }
 
-.vc-send-trail-toolbar-topline,
-.vc-send-trail-toolbar-footer,
+.vc-send-trail-history-shell-header,
+.vc-send-trail-history-footer,
 .vc-send-trail-group-header,
 .vc-send-trail-record-header,
 .vc-send-trail-purge-status,
@@ -91,9 +98,16 @@
     gap: 16px;
 }
 
-.vc-send-trail-toolbar-topline {
+.vc-send-trail-history-shell {
+    position: relative;
+    overflow: hidden;
+    background: var(--vc-send-trail-shell);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 4%), 0 18px 40px rgb(0 0 0 / 16%);
+}
+
+.vc-send-trail-history-shell-header {
     align-items: flex-start;
-    margin-bottom: 12px;
+    margin-bottom: 14px;
 }
 
 .vc-send-trail-toolbar-actions {
@@ -104,11 +118,47 @@
     gap: 8px;
 }
 
-.vc-send-trail-toolbar-summary {
+.vc-send-trail-history-shell-copy {
     display: flex;
     flex: 1 1 auto;
     flex-direction: column;
-    gap: 3px;
+    gap: 6px;
+}
+
+.vc-send-trail-history-subtitle {
+    margin: 0;
+    color: var(--text-muted);
+    max-width: 720px;
+}
+
+.vc-send-trail-history-chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 14px;
+}
+
+.vc-send-trail-history-chip {
+    display: inline-flex;
+    align-items: center;
+    min-height: 28px;
+    padding: 0 10px;
+    border: 1px solid rgb(255 255 255 / 8%);
+    border-radius: 8px;
+    background: rgb(255 255 255 / 5%);
+    color: var(--header-primary);
+    font-size: 0.82rem;
+    font-weight: 600;
+}
+
+.vc-send-trail-history-chip-accent {
+    background: var(--vc-send-trail-accent-soft);
+    border-color: rgb(244 189 106 / 22%);
+}
+
+.vc-send-trail-history-chip-protected {
+    background: rgb(114 137 218 / 12%);
+    border-color: rgb(114 137 218 / 24%);
 }
 
 .vc-send-trail-history-summary {
@@ -122,16 +172,25 @@
     display: inline-block;
 }
 
+.vc-send-trail-history-filter-surface {
+    padding: 14px;
+    border: 1px solid rgb(255 255 255 / 5%);
+    border-radius: 8px;
+    background: var(--vc-send-trail-shell-panel);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 3%);
+}
+
+.vc-send-trail-history-filter-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 12px;
+}
+
 .vc-send-trail-toolbar-grid {
     display: grid;
     gap: 12px;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-}
-
-.vc-send-trail-filter-panel {
-    margin-top: 10px;
-    padding-top: 12px;
-    border-top: 1px solid var(--vc-send-trail-border);
 }
 
 .vc-send-trail-toolbar-field {
@@ -153,9 +212,16 @@
     text-transform: uppercase;
 }
 
-.vc-send-trail-toolbar-footer {
-    margin-top: 12px;
-    padding-top: 12px;
+.vc-send-trail-history-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 14px;
+}
+
+.vc-send-trail-history-footer {
+    margin-top: 16px;
+    padding-top: 14px;
     border-top: 1px solid var(--vc-send-trail-border);
     align-items: flex-start;
 }
@@ -290,6 +356,15 @@
     display: flex;
     flex-direction: column;
     gap: 12px;
+    background: var(--vc-send-trail-record-surface);
+    box-shadow: 0 10px 22px rgb(0 0 0 / 10%);
+    transition: border-color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+}
+
+.vc-send-trail-record-card:hover {
+    border-color: color-mix(in oklab, var(--vc-send-trail-border) 74%, #c8d0dd 26%);
+    transform: translateY(-1px);
+    box-shadow: 0 14px 28px rgb(0 0 0 / 14%);
 }
 
 .vc-send-trail-record-meta {
@@ -454,8 +529,8 @@
 }
 
 @media (max-width: 760px) {
-    .vc-send-trail-toolbar-topline,
-    .vc-send-trail-toolbar-footer,
+    .vc-send-trail-history-shell-header,
+    .vc-send-trail-history-footer,
     .vc-send-trail-group-header,
     .vc-send-trail-record-header,
     .vc-send-trail-purge-status,
@@ -473,5 +548,9 @@
     .vc-send-trail-purge-status-title-row {
         flex-direction: column;
         align-items: flex-start;
+    }
+
+    .vc-send-trail-history-filter-surface {
+        padding: 12px;
     }
 }
