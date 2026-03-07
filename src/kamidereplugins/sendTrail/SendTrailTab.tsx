@@ -4,7 +4,7 @@ import { BaseText } from "@components/BaseText";
 import { Button, TextButton } from "@components/Button";
 import { Card } from "@components/Card";
 import { Heading, HeadingTertiary } from "@components/Heading";
-import { CogWheel, DeleteIcon, LogIcon } from "@components/Icons";
+import { CogWheel, DeleteIcon, LogIcon, MagnifyingGlassIcon } from "@components/Icons";
 import { Notice } from "@components/Notice";
 import { Paragraph } from "@components/Paragraph";
 import { SettingsTab, wrapTab } from "@components/settings";
@@ -15,7 +15,7 @@ import { classNameFactory } from "@utils/css";
 import { Margins } from "@utils/margins";
 import { closeModal, ModalCloseButton, ModalContent, ModalFooter, ModalHeader, ModalProps, ModalRoot, ModalSize, openModal } from "@utils/modal";
 import { sleep } from "@utils/misc";
-import { Alerts, ChannelStore, MessageActions, NavigationRouter, React, Select, TextInput, Toasts, UserStore, useStateFromStores } from "@webpack/common";
+import { Alerts, ChannelStore, MessageActions, NavigationRouter, React, Select, Toasts, UserStore, useStateFromStores } from "@webpack/common";
 
 import { clearSentTrailRecords, removeSentTrailRecord, useSentTrailRecords } from "./store";
 import { parseProtectedDmChannels, settings, SendTrailPurgeTarget } from "./settings";
@@ -25,6 +25,7 @@ import { buildSearchIndex, formatDayLabel, formatTime, getChannelRecipientIds, r
 const cl = classNameFactory("vc-send-trail-");
 const LIVE_DELETE_DELAY_MS = 850;
 const PURGE_STATUS_HIDE_DELAY_MS = 2400;
+const PURGE_STATUS_TRANSITION_MS = 280;
 
 const HERO_BACKGROUND = `data:image/svg+xml;utf8,${encodeURIComponent(
     [
@@ -435,12 +436,22 @@ function SendTrailTab() {
     const [selectedIds, setSelectedIds] = React.useState<Set<string>>(() => new Set());
     const [deletingIds, setDeletingIds] = React.useState<Set<string>>(() => new Set());
     const [purgeStatus, setPurgeStatus] = React.useState<PurgeStatusState>(makeEmptyPurgeStatus);
+    const [renderedPurgeStatus, setRenderedPurgeStatus] = React.useState<PurgeStatusState>(makeEmptyPurgeStatus);
+    const [isPurgeStatusVisible, setIsPurgeStatusVisible] = React.useState(false);
     const purgeStatusTimerRef = React.useRef<number | null>(null);
+    const purgeStatusExitTimerRef = React.useRef<number | null>(null);
+    const purgeStatusFrameRef = React.useRef<number | null>(null);
 
     React.useEffect(() => {
         return () => {
             if (purgeStatusTimerRef.current) {
                 window.clearTimeout(purgeStatusTimerRef.current);
+            }
+            if (purgeStatusExitTimerRef.current) {
+                window.clearTimeout(purgeStatusExitTimerRef.current);
+            }
+            if (purgeStatusFrameRef.current) {
+                window.cancelAnimationFrame(purgeStatusFrameRef.current);
             }
         };
     }, []);
@@ -465,6 +476,43 @@ function SendTrailTab() {
             purgeStatusTimerRef.current = null;
         }, PURGE_STATUS_HIDE_DELAY_MS);
     }, [purgeStatus]);
+
+    React.useEffect(() => {
+        if (purgeStatus.phase !== "idle") {
+            if (purgeStatusExitTimerRef.current) {
+                window.clearTimeout(purgeStatusExitTimerRef.current);
+                purgeStatusExitTimerRef.current = null;
+            }
+            if (purgeStatusFrameRef.current) {
+                window.cancelAnimationFrame(purgeStatusFrameRef.current);
+            }
+
+            setRenderedPurgeStatus(purgeStatus);
+            purgeStatusFrameRef.current = window.requestAnimationFrame(() => {
+                setIsPurgeStatusVisible(true);
+                purgeStatusFrameRef.current = null;
+            });
+            return;
+        }
+
+        if (renderedPurgeStatus.phase === "idle") return;
+
+        if (purgeStatusFrameRef.current) {
+            window.cancelAnimationFrame(purgeStatusFrameRef.current);
+            purgeStatusFrameRef.current = null;
+        }
+
+        setIsPurgeStatusVisible(false);
+
+        if (purgeStatusExitTimerRef.current) {
+            window.clearTimeout(purgeStatusExitTimerRef.current);
+        }
+
+        purgeStatusExitTimerRef.current = window.setTimeout(() => {
+            setRenderedPurgeStatus(makeEmptyPurgeStatus());
+            purgeStatusExitTimerRef.current = null;
+        }, PURGE_STATUS_TRANSITION_MS);
+    }, [purgeStatus, renderedPurgeStatus.phase]);
 
     const updateDeletingId = React.useCallback((recordId: string, active: boolean) => {
         setDeletingIds(current => {
@@ -768,21 +816,41 @@ function SendTrailTab() {
                     </div>
 
                     <div className={cl("toolbar-actions")}>
-                        <Button size="xs" variant="secondary" disabled={filteredRecords.length === 0 || isBusy} onClick={toggleVisibleSelection}>
-                            {allVisibleSelected ? "Unselect Visible" : "Select Visible"}
+                        <Button
+                            size="small"
+                            variant="secondary"
+                            className={cl("action-button", "action-button-select")}
+                            disabled={filteredRecords.length === 0 || isBusy}
+                            onClick={toggleVisibleSelection}
+                        >
+                            <span>{allVisibleSelected ? "Unselect Visible" : "Select Visible"}</span>
+                            <span className={cl("action-button-count")}>{filteredRecords.length}</span>
                         </Button>
                         {selectedRecords.length > 0 && (
-                            <Button size="xs" variant="secondary" disabled={isBusy} onClick={clearSelection}>
+                            <TextButton variant="secondary" className={cl("toolbar-clear")} disabled={isBusy} onClick={clearSelection}>
                                 Clear Selection
-                            </Button>
+                            </TextButton>
                         )}
-                        <Button size="xs" variant="secondary" disabled={isBusy} onClick={openConfigModal}>
-                            <CogWheel width={14} height={14} />
-                            <span className={cl("button-label")}>Config</span>
+                        <Button
+                            size="iconOnly"
+                            variant="secondary"
+                            className={cl("action-icon-button")}
+                            disabled={isBusy}
+                            onClick={openConfigModal}
+                            title="Open purge config"
+                            aria-label="Open purge config"
+                        >
+                            <CogWheel width={16} height={16} />
                         </Button>
-                        <Button size="xs" variant="dangerPrimary" disabled={selectedRecords.length === 0 || isBusy} onClick={confirmPurge}>
-                            <DeleteIcon width={14} height={14} />
-                            <span className={cl("button-label")}>Purge</span>
+                        <Button
+                            size="small"
+                            variant="dangerPrimary"
+                            className={cl("action-button", "action-button-purge")}
+                            disabled={selectedRecords.length === 0 || isBusy}
+                            onClick={confirmPurge}
+                        >
+                            <DeleteIcon width={15} height={15} />
+                            <span>Purge Selected</span>
                         </Button>
                     </div>
                 </div>
@@ -844,17 +912,33 @@ function SendTrailTab() {
 
                         <div className={cl("toolbar-field", "search")}>
                             <Paragraph className={cl("field-label")}>Search</Paragraph>
-                            <TextInput
-                                value={query}
-                                placeholder="Search content, server, channel, or media..."
-                                onChange={setQuery}
-                                disabled={isBusy}
-                            />
+                            <label className={cl("search-shell")}>
+                                <MagnifyingGlassIcon className={cl("search-icon")} width={16} height={16} />
+                                <input
+                                    className={cl("search-input")}
+                                    type="text"
+                                    value={query}
+                                    placeholder="Search messages, channels, servers, or media"
+                                    onChange={event => setQuery(event.currentTarget.value)}
+                                    disabled={isBusy}
+                                    spellCheck={false}
+                                />
+                            </label>
                         </div>
                     </div>
                 </div>
 
-                <PurgeStatusBanner status={purgeStatus} />
+                <div
+                    className={cl(
+                        "purge-status-region",
+                        renderedPurgeStatus.phase !== "idle" ? "purge-status-region-mounted" : "purge-status-region-empty",
+                        isPurgeStatusVisible ? "purge-status-region-visible" : "purge-status-region-hidden",
+                    )}
+                >
+                    {renderedPurgeStatus.phase !== "idle" && (
+                        <PurgeStatusBanner status={renderedPurgeStatus} />
+                    )}
+                </div>
 
                 <div className={cl("history-list")}>
                     {pending && (
