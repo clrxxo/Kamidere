@@ -1,5 +1,5 @@
 .vc-presence-lab-shell {
-    --presence-lab-shell-width: min(1180px, calc(100vw - 260px), calc(100% + 180px));
+    --presence-lab-shell-width: min(1220px, calc(100vw - 240px), calc(100% + 220px));
     position: relative;
     display: flex;
     flex-direction: column;
