@@ -31,7 +31,7 @@
     min-height: 30px;
     padding: 0 11px;
     border: 1px solid var(--vc-send-trail-border);
-    border-radius: 10px;
+    border-radius: 8px;
     background: var(--vc-send-trail-surface-alt);
     color: var(--header-primary);
     font-size: 0.84rem;
@@ -71,10 +71,10 @@
 .vc-send-trail-empty-card,
 .vc-send-trail-config-empty,
 .vc-send-trail-config-item {
-    margin-top: 16px;
+    margin-top: 12px;
     border: 1px solid var(--vc-send-trail-border);
     background: var(--vc-send-trail-surface);
-    border-radius: 14px;
+    border-radius: 10px;
 }
 
 .vc-send-trail-toolbar-topline,
@@ -92,11 +92,30 @@
 }
 
 .vc-send-trail-toolbar-topline {
-    margin-bottom: 16px;
+    align-items: flex-start;
+    margin-bottom: 0;
+}
+
+.vc-send-trail-toolbar-actions {
+    justify-content: flex-end;
 }
 
 .vc-send-trail-toolbar-actions .vc-btn-base {
     gap: 8px;
+}
+
+.vc-send-trail-toolbar-summary {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.vc-send-trail-history-summary {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 0.84rem;
+    line-height: 1.35;
 }
 
 .vc-send-trail-button-label {
@@ -105,8 +124,11 @@
 
 .vc-send-trail-toolbar-grid {
     display: grid;
-    gap: 16px;
+    gap: 12px;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid var(--vc-send-trail-border);
 }
 
 .vc-send-trail-toolbar-field {
@@ -129,8 +151,8 @@
 }
 
 .vc-send-trail-toolbar-footer {
-    margin-top: 16px;
-    padding-top: 14px;
+    margin-top: 12px;
+    padding-top: 12px;
     border-top: 1px solid var(--vc-send-trail-border);
     align-items: flex-start;
 }
@@ -146,10 +168,10 @@
 }
 
 .vc-send-trail-purge-status {
-    margin-top: 16px;
+    margin-top: 12px;
     padding: 16px 18px;
     border: 1px solid var(--vc-send-trail-border);
-    border-radius: 14px;
+    border-radius: 10px;
     background: var(--vc-send-trail-surface);
 }
 
@@ -243,28 +265,67 @@
 }
 
 .vc-send-trail-group {
-    margin-top: 20px;
+    margin-top: 16px;
 }
 
 .vc-send-trail-group-header {
     margin-bottom: 12px;
 }
 
+.vc-send-trail-group-count {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
 .vc-send-trail-group-list {
     display: grid;
-    gap: 12px;
+    gap: 10px;
 }
 
 .vc-send-trail-record-card {
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 12px;
 }
 
 .vc-send-trail-record-meta {
     display: flex;
     flex-direction: column;
+    gap: 6px;
+}
+
+.vc-send-trail-record-origin-line {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
     gap: 8px;
+}
+
+.vc-send-trail-record-scope-label {
+    color: var(--text-muted);
+    font-size: 0.76rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.vc-send-trail-record-separator {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+}
+
+.vc-send-trail-record-flag {
+    display: inline-flex;
+    align-items: center;
+    min-height: 22px;
+    padding: 0 8px;
+    border: 1px solid rgb(114 137 218 / 22%);
+    border-radius: 6px;
+    background: rgb(114 137 218 / 12%);
+    color: var(--header-primary);
+    font-size: 0.72rem;
+    font-weight: 700;
 }
 
 .vc-send-trail-channel-name {
@@ -275,6 +336,17 @@
 
 .vc-send-trail-record-actions {
     align-items: flex-end;
+    gap: 8px;
+}
+
+.vc-send-trail-record-header {
+    align-items: flex-start;
+}
+
+.vc-send-trail-record-time {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    font-weight: 600;
 }
 
 .vc-send-trail-record-content {
@@ -295,7 +367,7 @@
     flex-direction: column;
     overflow: hidden;
     border: 1px solid var(--vc-send-trail-border);
-    border-radius: 12px;
+    border-radius: 8px;
     background: var(--vc-send-trail-surface-alt);
     color: inherit;
     text-decoration: none;

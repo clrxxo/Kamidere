@@ -232,7 +232,7 @@ function PurgeStatusBanner({ status }: { status: PurgeStatusState; }) {
                 <div className={cl("purge-status-title-row")}>
                     <BaseText size="md" weight="semibold">{title}</BaseText>
                     <span className={cl("meta-tag", "quiet")}>
-                        {status.deleted} deleted{status.failed ? ` · ${status.failed} failed` : ""}{status.skipped ? ` · ${status.skipped} skipped` : ""}
+                        {status.deleted} deleted{status.failed ? ` / ${status.failed} failed` : ""}{status.skipped ? ` / ${status.skipped} skipped` : ""}
                     </span>
                 </div>
                 <Paragraph className={cl("purge-status-text")}>{subtitle}</Paragraph>
@@ -330,7 +330,7 @@ function SendTrailConfigModal({
                                 <div className={cl("config-item-copy")}>
                                     <BaseText size="md" weight="semibold">{conversation.label}</BaseText>
                                     <Paragraph className={cl("config-hint")}>
-                                        {conversation.details} · {conversation.count} saved message{conversation.count === 1 ? "" : "s"}
+                                        {conversation.details} / {conversation.count} saved message{conversation.count === 1 ? "" : "s"}
                                     </Paragraph>
                                 </div>
                                 <Switch
@@ -369,15 +369,16 @@ function RecordCard({
         <Card className={cl("record-card")} defaultPadding>
             <div className={cl("record-header")}>
                 <div className={cl("record-meta")}>
-                    <div className={cl("record-context-row")}>
-                        <span className={cl("scope-tag", context.isDirectMessage ? "dm" : "guild")}>
+                    <div className={cl("record-origin-line")}>
+                        <span className={cl("record-scope-label")}>
                             {context.isDirectMessage ? "Direct Messages" : context.guildName}
                         </span>
+                        <span className={cl("record-separator")}>/</span>
                         <span className={cl("channel-name")}>
                             {context.isDirectMessage ? context.channelName : `#${context.channelName}`}
                         </span>
                         {protectedFromPurge && (
-                            <span className={cl("meta-tag", "protected")}>Protected</span>
+                            <span className={cl("record-flag")}>Protected</span>
                         )}
                     </div>
 
@@ -387,7 +388,7 @@ function RecordCard({
                 </div>
 
                 <div className={cl("record-actions")}>
-                    <span className={cl("time-tag")}>{formatTime(record.timestamp)}</span>
+                    <span className={cl("record-time")}>{formatTime(record.timestamp)}</span>
                     <div className={cl("record-buttons")}>
                         <Button size="xs" variant="secondary" onClick={() => NavigationRouter.transitionTo(record.jumpLink)}>
                             Open
@@ -431,6 +432,7 @@ function SendTrailTab() {
     const [kind, setKind] = React.useState<KindValue>("all");
     const [period, setPeriod] = React.useState<PeriodValue>("all");
     const [query, setQuery] = React.useState("");
+    const [filtersExpanded, setFiltersExpanded] = React.useState(false);
     const [selectedIds, setSelectedIds] = React.useState<Set<string>>(() => new Set());
     const [deletingIds, setDeletingIds] = React.useState<Set<string>>(() => new Set());
     const [purgeStatus, setPurgeStatus] = React.useState<PurgeStatusState>(makeEmptyPurgeStatus);
@@ -558,6 +560,9 @@ function SendTrailTab() {
     const protectedSelectedCount = selectedRecords.length - selectedEligibleRecords.length;
     const dmConversationCount = React.useMemo(() => buildDmConversations(records).length, [records]);
     const isBusy = purgeStatus.phase === "running";
+    const scopeLabel = scopeOptions.find(option => option.value === scope)?.label ?? "All destinations";
+    const kindLabel = kindOptions.find(option => option.value === kind)?.label ?? "Everything";
+    const periodLabel = periodOptions.find(option => option.value === period)?.label ?? "All time";
 
     const toggleVisibleSelection = React.useCallback(() => {
         setSelectedIds(current => {
@@ -754,89 +759,95 @@ function SendTrailTab() {
             </Notice.Info>
 
             <Heading className={Margins.top20}>History</Heading>
-            <Paragraph className={Margins.bottom16}>
-                Filter the log, select the entries you want gone, then let Send Trail purge them safely.
-            </Paragraph>
 
             <Card className={cl("toolbar-card")} defaultPadding>
                 <div className={cl("toolbar-topline")}>
-                    <div className={cl("meta-row")}>
-                        <span className={cl("meta-tag")}>{filteredRecords.length} visible</span>
-                        <span className={cl("meta-tag")}>{selectedRecords.length} selected</span>
-                        <span className={cl("meta-tag", "accent")}>{selectedEligibleRecords.length} eligible</span>
-                        {!!protectedSelectedCount && (
-                            <span className={cl("meta-tag", "protected")}>{protectedSelectedCount} protected</span>
-                        )}
+                    <div className={cl("toolbar-summary")}>
+                        <HeadingTertiary className={Margins.reset}>Sent Messages</HeadingTertiary>
+                        <Paragraph className={cl("history-summary")}>
+                            {filteredRecords.length} visible / {selectedRecords.length} selected / {selectedEligibleRecords.length} eligible
+                            {!!protectedSelectedCount && ` / ${protectedSelectedCount} protected`}
+                        </Paragraph>
+                        <Paragraph className={cl("history-summary")}>
+                            {scopeLabel} / {kindLabel} / {periodLabel}
+                        </Paragraph>
                     </div>
 
                     <div className={cl("toolbar-actions")}>
-                        <Button size="small" variant="secondary" disabled={filteredRecords.length === 0 || isBusy} onClick={toggleVisibleSelection}>
+                        <Button size="xs" variant="secondary" disabled={isBusy} onClick={() => setFiltersExpanded(current => !current)}>
+                            {filtersExpanded ? "Hide Filters" : "Filters"}
+                        </Button>
+                        <Button size="xs" variant="secondary" disabled={filteredRecords.length === 0 || isBusy} onClick={toggleVisibleSelection}>
                             {allVisibleSelected ? "Unselect Visible" : "Select Visible"}
                         </Button>
-                        <Button size="small" variant="secondary" disabled={selectedRecords.length === 0 || isBusy} onClick={clearSelection}>
-                            Clear Selection
+                        {selectedRecords.length > 0 && (
+                            <Button size="xs" variant="secondary" disabled={isBusy} onClick={clearSelection}>
+                                Clear Selection
+                            </Button>
+                        )}
+                        <Button size="xs" variant="secondary" disabled={isBusy} onClick={openConfigModal}>
+                            <CogWheel width={14} height={14} />
+                            <span className={cl("button-label")}>Config</span>
                         </Button>
-                        <Button size="small" variant="secondary" disabled={isBusy} onClick={openConfigModal}>
-                            <CogWheel width={16} height={16} />
-                            <span className={cl("button-label")}>Purge Config</span>
-                        </Button>
-                        <Button size="small" variant="dangerPrimary" disabled={selectedRecords.length === 0 || isBusy} onClick={confirmPurge}>
-                            <DeleteIcon width={16} height={16} />
-                            <span className={cl("button-label")}>Purge Selected</span>
+                        <Button size="xs" variant="dangerPrimary" disabled={selectedRecords.length === 0 || isBusy} onClick={confirmPurge}>
+                            <DeleteIcon width={14} height={14} />
+                            <span className={cl("button-label")}>Purge</span>
                         </Button>
                     </div>
                 </div>
 
-                <div className={cl("toolbar-grid")}>
-                    <div className={cl("toolbar-field")}>
-                        <Paragraph className={cl("field-label")}>Destination</Paragraph>
-                        <Select
-                            options={scopeOptions}
-                            select={(value: ScopeValue) => setScope(value)}
-                            isSelected={(value: ScopeValue) => scope === value}
-                            serialize={(value: ScopeValue) => value}
-                            isDisabled={isBusy}
-                        />
-                    </div>
+                {filtersExpanded && (
+                    <div className={cl("toolbar-grid")}>
+                        <div className={cl("toolbar-field")}>
+                            <Paragraph className={cl("field-label")}>Destination</Paragraph>
+                            <Select
+                                options={scopeOptions}
+                                select={(value: ScopeValue) => setScope(value)}
+                                isSelected={(value: ScopeValue) => scope === value}
+                                serialize={(value: ScopeValue) => value}
+                                isDisabled={isBusy}
+                            />
+                        </div>
 
-                    <div className={cl("toolbar-field")}>
-                        <Paragraph className={cl("field-label")}>Content Type</Paragraph>
-                        <Select
-                            options={kindOptions}
-                            select={(value: KindValue) => setKind(value)}
-                            isSelected={(value: KindValue) => kind === value}
-                            serialize={(value: KindValue) => value}
-                            isDisabled={isBusy}
-                        />
-                    </div>
+                        <div className={cl("toolbar-field")}>
+                            <Paragraph className={cl("field-label")}>Content Type</Paragraph>
+                            <Select
+                                options={kindOptions}
+                                select={(value: KindValue) => setKind(value)}
+                                isSelected={(value: KindValue) => kind === value}
+                                serialize={(value: KindValue) => value}
+                                isDisabled={isBusy}
+                            />
+                        </div>
 
-                    <div className={cl("toolbar-field")}>
-                        <Paragraph className={cl("field-label")}>Period</Paragraph>
-                        <Select
-                            options={periodOptions}
-                            select={(value: PeriodValue) => setPeriod(value)}
-                            isSelected={(value: PeriodValue) => period === value}
-                            serialize={(value: PeriodValue) => value}
-                            isDisabled={isBusy}
-                        />
-                    </div>
+                        <div className={cl("toolbar-field")}>
+                            <Paragraph className={cl("field-label")}>Period</Paragraph>
+                            <Select
+                                options={periodOptions}
+                                select={(value: PeriodValue) => setPeriod(value)}
+                                isSelected={(value: PeriodValue) => period === value}
+                                serialize={(value: PeriodValue) => value}
+                                isDisabled={isBusy}
+                            />
+                        </div>
 
-                    <div className={cl("toolbar-field", "search")}>
-                        <Paragraph className={cl("field-label")}>Search</Paragraph>
-                        <TextInput
-                            value={query}
-                            placeholder="Search content, server, channel, or media..."
-                            onChange={setQuery}
-                            disabled={isBusy}
-                        />
+                        <div className={cl("toolbar-field", "search")}>
+                            <Paragraph className={cl("field-label")}>Search</Paragraph>
+                            <TextInput
+                                value={query}
+                                placeholder="Search content, server, channel, or media..."
+                                onChange={setQuery}
+                                disabled={isBusy}
+                            />
+                        </div>
                     </div>
-                </div>
+                )}
 
                 <div className={cl("toolbar-footer")}>
-                    <Paragraph className={cl("toolbar-hint")}>
+                    <Paragraph className={cl("history-summary")}>
                         Purge target: {purgeTarget === "all" ? "everything" : purgeTarget === "dms" ? "DMs only" : "servers only"}
-                        {purgeConfig.protectAllDms ? " · all DMs protected" : ""}
-                        {protectedDmChannels.size ? ` · ${protectedDmChannels.size} DM thread${protectedDmChannels.size === 1 ? "" : "s"} protected` : ""}
+                        {purgeConfig.protectAllDms ? " / all DMs protected" : ""}
+                        {protectedDmChannels.size ? ` / ${protectedDmChannels.size} DM thread${protectedDmChannels.size === 1 ? "" : "s"} protected` : ""}
                     </Paragraph>
                     <TextButton variant="secondary" disabled={records.length === 0 || isBusy} onClick={confirmLocalClear}>
                         Clear Local History
@@ -877,7 +888,7 @@ function SendTrailTab() {
                 <div key={group.label} className={cl("group")}>
                     <div className={cl("group-header")}>
                         <HeadingTertiary className={Margins.reset}>{group.label}</HeadingTertiary>
-                        <span className={cl("meta-tag")}>
+                        <span className={cl("group-count")}>
                             {group.records.length} entr{group.records.length === 1 ? "y" : "ies"}
                         </span>
                     </div>
