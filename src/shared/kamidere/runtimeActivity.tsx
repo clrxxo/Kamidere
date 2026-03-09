@@ -271,6 +271,10 @@ function TaskCard({ task, animate = true }: { task: KamidereRuntimeTask; animate
     const progressLabel = task.progressCurrent != null
         ? `${task.progressCurrent}/${task.progressTotal ?? "?"}`
         : task.detail ?? "Live";
+    const supplementalDetail = task.detail && task.detail !== progressLabel ? task.detail : null;
+    const detailLine = task.subtitle && supplementalDetail
+        ? `${task.subtitle} · ${supplementalDetail}`
+        : task.subtitle ?? supplementalDetail ?? (isRunning ? "Running" : task.status);
 
     return (
         <div className={cl("task", animate && "task-enter")}>
@@ -281,7 +285,7 @@ function TaskCard({ task, animate = true }: { task: KamidereRuntimeTask; animate
                         <div className={cl("task-name")}>{task.name}</div>
                         <div className={cl("task-count")}>{progressLabel}</div>
                     </div>
-                    <div className={cl("task-detail")}>{task.subtitle ?? task.detail ?? (isRunning ? "Running" : task.status)}</div>
+                    <div className={cl("task-detail")}>{detailLine}</div>
                 </div>
             </div>
 

@@ -26,7 +26,7 @@ import {
 import { classNameFactory } from "@utils/css";
 import { openUserProfile } from "@utils/discord";
 import { Margins } from "@utils/margins";
-import { Alerts, GuildMemberStore, GuildStore, React, Toasts, useStateFromStores } from "@webpack/common";
+import { Alerts, GuildMemberCountStore, GuildMemberStore, GuildStore, React, Toasts, useStateFromStores } from "@webpack/common";
 
 import {
     cancelMutualScannerRun,
@@ -51,9 +51,14 @@ import type {
     MutualScannerRun,
 } from "./types";
 import {
+    buildMutualScannerRunComparison,
     buildGuildOptions,
     formatDateTime,
     formatDurationMs,
+    getHydrationSnapshotQuality,
+    getHydrationSnapshotQualityLabel,
+    isComparableMutualScannerRun,
+    isHydrationSnapshotWeak,
 } from "./utils";
 
 const cl = classNameFactory("vc-mutual-scanner-");
@@ -145,6 +150,17 @@ function formatManualWarmupState(state: MutualScannerWarmupProgressState["state"
         default:
             return "Running";
     }
+}
+
+function formatDiffNames(matches: MutualScannerMatch[], limit = 3) {
+    if (matches.length === 0) return "";
+
+    const labels = matches.slice(0, limit).map(match => match.label);
+    if (matches.length <= limit) {
+        return labels.join(", ");
+    }
+
+    return `${labels.join(", ")} +${matches.length - limit}`;
 }
 
 function buildRunQuery(run: MutualScannerRun) {
@@ -364,9 +380,11 @@ function HistoryAnimatedMatchRow({
 
 function RunCard({
     run,
+    comparison,
     onRemove,
 }: {
     run: MutualScannerRun;
+    comparison: ReturnType<typeof buildMutualScannerRunComparison>;
     onRemove(): void;
 }) {
     const duration = Math.max(0, run.finishedAt - run.startedAt);
@@ -393,6 +411,36 @@ function RunCard({
                 <span className={cl("badge", "quiet")}>{run.stats.profileErrors} errors</span>
                 {run.stats.countOnlyMatches > 0 && <span className={cl("badge", "warn")}>{run.stats.countOnlyMatches} count</span>}
             </div>
+
+            {comparison.previousRun && (
+                <div className={cl("run-diff-block")}>
+                    <div className={cl("run-diff-header")}>
+                        <Paragraph className={cl("muted-copy")}>
+                            Compared with {formatDateTime(comparison.previousRun.startedAt)}
+                        </Paragraph>
+                        <div className={cl("run-stats")}>
+                            <span className={cl("badge", "success")}>+{comparison.newMatches.length} new</span>
+                            <span className={cl("badge", "quiet")}>{comparison.sameMatches.length} same</span>
+                            <span className={cl("badge", "danger")}>-{comparison.disappearedMatches.length} gone</span>
+                        </div>
+                    </div>
+
+                    {(comparison.newMatches.length > 0 || comparison.disappearedMatches.length > 0) && (
+                        <div className={cl("run-diff-copy")}>
+                            {comparison.newMatches.length > 0 && (
+                                <Paragraph className={cl("muted-copy")}>
+                                    New: {formatDiffNames(comparison.newMatches)}
+                                </Paragraph>
+                            )}
+                            {comparison.disappearedMatches.length > 0 && (
+                                <Paragraph className={cl("muted-copy")}>
+                                    Gone: {formatDiffNames(comparison.disappearedMatches)}
+                                </Paragraph>
+                            )}
+                        </div>
+                    )}
+                </div>
+            )}
 
             {run.error && (
                 <Notice.Info className={cl("inline-notice")}>
@@ -464,12 +512,21 @@ function RuntimePreviewRunCard({
 
 function HydrationCacheRow({
     snapshot,
+    quality,
+    targetCount,
+    onRewarm,
+    rewarmDisabled,
     onClear,
 }: {
     snapshot: GuildHydrationSnapshot;
+    quality: ReturnType<typeof getHydrationSnapshotQuality>;
+    targetCount: number | null;
+    onRewarm(): void;
+    rewarmDisabled: boolean;
     onClear(): void;
 }) {
     const guildLabel = GuildStore.getGuild(snapshot.guildId)?.name ?? snapshot.guildId;
+    const qualityLabel = getHydrationSnapshotQualityLabel(quality);
 
     return (
         <Card className={cl("run-card", "cache-card")} defaultPadding>
@@ -482,20 +539,24 @@ function HydrationCacheRow({
                 </div>
 
                 <div className={cl("run-actions")}>
-                    <span className={cl("status-pill", snapshot.timedOut ? "failed" : "completed")}>
-                        {snapshot.timedOut ? "Timed out" : "Ready"}
+                    <span className={cl("status-pill", quality === "partial" ? "failed" : quality === "cancelled" ? "cancelled" : quality === "stale" ? "running" : "completed")}>
+                        {qualityLabel}
                     </span>
+                    <TextButton variant="secondary" disabled={rewarmDisabled} onClick={onRewarm}>Rewarm</TextButton>
                     <TextButton variant="danger" onClick={onClear}>Clear</TextButton>
                 </div>
             </div>
 
             <div className={cl("cache-stat-grid")}>
                 <span className={cl("badge")}>{snapshot.memberIds.length} indexed</span>
+                {targetCount != null && <span className={cl("badge", "quiet")}>{snapshot.finalCount}/{targetCount} target</span>}
                 <div className={cl("cache-stat-pair")}>
                     <span className={cl("badge", "quiet")}>+{snapshot.delta} hydrated</span>
                     {snapshot.chunksSeen > 0 && <span className={cl("badge", "quiet")}>{snapshot.chunksSeen} chunks</span>}
                 </div>
                 {snapshot.budgetReached && <span className={cl("badge", "warn")}>budget reached</span>}
+                {snapshot.timedOut && <span className={cl("badge", "danger")}>timed out</span>}
+                {snapshot.cancelled && <span className={cl("badge", "danger")}>cancelled</span>}
             </div>
         </Card>
     );
@@ -534,6 +595,21 @@ function MutualScannerTab() {
     const guildOptions = useStateFromStores([GuildStore, GuildMemberStore], () =>
         buildGuildOptions(),
     ) as MutualScannerGuildOption[];
+    const guildTargetCountMap = useStateFromStores([GuildStore, GuildMemberStore, GuildMemberCountStore], () =>
+        new Map(
+            GuildStore.getGuildsArray().map(guild => [
+                guild.id,
+                GuildMemberCountStore.getMemberCount(guild.id)
+                ?? (guild as { memberCount?: number; }).memberCount
+                ?? GuildMemberStore.getMemberIds(guild.id)?.length
+                ?? GuildMemberStore.getMembers(guild.id)?.length
+                ?? null,
+            ]),
+        ),
+    ) as Map<string, number | null>;
+    const hydrationSnapshotMap = React.useMemo(() =>
+        new Map(hydrationSnapshots.map(snapshot => [snapshot.guildId, snapshot])),
+    [hydrationSnapshots]);
 
     const selectedGuilds = React.useMemo(() =>
         guildOptions.filter(option => data.config.selectedGuildIds.includes(option.id)),
@@ -552,6 +628,17 @@ function MutualScannerTab() {
         if (!query) return data.runs;
         return data.runs.filter(run => buildRunQuery(run).includes(query));
     }, [data.runs, historySearch]);
+    const runComparisons = React.useMemo(() => {
+        const comparisons = new Map<string, ReturnType<typeof buildMutualScannerRunComparison>>();
+
+        for (let index = 0; index < data.runs.length; index++) {
+            const run = data.runs[index];
+            const previousRun = data.runs.slice(index + 1).find(candidate => isComparableMutualScannerRun(run, candidate)) ?? null;
+            comparisons.set(run.id, buildMutualScannerRunComparison(run, previousRun));
+        }
+
+        return comparisons;
+    }, [data.runs]);
     const runtimeHistoryMatches = React.useMemo(() => {
         if (!isRunning) return [] as MutualScannerMatch[];
         const now = Date.now();
@@ -585,6 +672,22 @@ function MutualScannerTab() {
     const progressPercent = runtimeProgress?.totalCandidates
         ? Math.min(100, Math.round((runtimeProgress.scannedCount / runtimeProgress.totalCandidates) * 100))
         : 0;
+    const retryGuildIds = React.useMemo(() => {
+        const selectedWeakGuildIds = data.config.selectedGuildIds.filter(guildId =>
+            isHydrationSnapshotWeak(
+                hydrationSnapshotMap.get(guildId),
+                guildTargetCountMap.get(guildId) ?? null,
+            ),
+        );
+
+        if (selectedWeakGuildIds.length > 0) {
+            return selectedWeakGuildIds;
+        }
+
+        return hydrationSnapshots
+            .filter(snapshot => isHydrationSnapshotWeak(snapshot, guildTargetCountMap.get(snapshot.guildId) ?? null))
+            .map(snapshot => snapshot.guildId);
+    }, [data.config.selectedGuildIds, guildTargetCountMap, hydrationSnapshotMap, hydrationSnapshots]);
 
     const clearScanStatusTimers = React.useCallback(() => {
         if (scanStatusHideTimerRef.current !== null) {
@@ -830,6 +933,44 @@ function MutualScannerTab() {
         await refreshHydrationSnapshots();
         showToast("Removed guild hydration snapshot.", Toasts.Type.SUCCESS);
     }, [currentUserId, refreshHydrationSnapshots]);
+
+    const startWarmupForGuildIds = React.useCallback((guildIds: string[], successLabel: string, failureLabel: string) => {
+        if (!currentUserId) return;
+        if (guildIds.length === 0) {
+            showToast(failureLabel, Toasts.Type.FAILURE);
+            return;
+        }
+
+        const started = startMutualScannerWarmup(currentUserId, {
+            selectedGuildIds: guildIds,
+            warmupMemberBudget: data.config.warmupMemberBudget,
+            warmupTimeoutMs: data.config.warmupTimeoutMs,
+        });
+
+        if (!started) {
+            showToast("Manual cache warmup could not start.", Toasts.Type.FAILURE);
+            return;
+        }
+
+        showToast(successLabel, Toasts.Type.SUCCESS);
+    }, [currentUserId, data.config.warmupMemberBudget, data.config.warmupTimeoutMs]);
+
+    const retryWeakGuilds = React.useCallback(() => {
+        startWarmupForGuildIds(
+            retryGuildIds,
+            `Retrying cache warmup for ${retryGuildIds.length} server${retryGuildIds.length === 1 ? "" : "s"}.`,
+            "No incomplete or stale guild caches need a retry right now.",
+        );
+    }, [retryGuildIds, startWarmupForGuildIds]);
+
+    const rewarmGuild = React.useCallback((guildId: string) => {
+        const guildLabel = GuildStore.getGuild(guildId)?.name ?? guildId;
+        startWarmupForGuildIds(
+            [guildId],
+            `Rewarming ${guildLabel}.`,
+            "This guild could not be queued for rewarm.",
+        );
+    }, [startWarmupForGuildIds]);
 
     const triggerManualWarmup = React.useCallback(() => {
         if (isManualWarmupRunning) {
@@ -1302,6 +1443,7 @@ function MutualScannerTab() {
                                 <RunCard
                                     key={run.id}
                                     run={run}
+                                    comparison={runComparisons.get(run.id) ?? buildMutualScannerRunComparison(run, null)}
                                     onRemove={() => void removeMutualScannerRun(currentUserId, run.id)}
                                 />
                             ))}
@@ -1316,6 +1458,13 @@ function MutualScannerTab() {
                             </div>
                             <div className={cl("section-actions")}>
                                 <span className={cl("section-chip")}>{hydrationSnapshots.length} cached</span>
+                                <TextButton
+                                    variant="secondary"
+                                    disabled={retryGuildIds.length === 0 || hydrationPending || isManualWarmupRunning || isRunning}
+                                    onClick={retryWeakGuilds}
+                                >
+                                    Retry Weak Guilds
+                                </TextButton>
                                 <TextButton variant="danger" disabled={hydrationSnapshots.length === 0 || hydrationPending} onClick={clearHydrationCache}>Clear All</TextButton>
                             </div>
                         </div>
@@ -1340,6 +1489,10 @@ function MutualScannerTab() {
                                 <HydrationCacheRow
                                     key={`${snapshot.guildId}:${snapshot.warmedAt}`}
                                     snapshot={snapshot}
+                                    quality={getHydrationSnapshotQuality(snapshot, guildTargetCountMap.get(snapshot.guildId) ?? null)}
+                                    targetCount={guildTargetCountMap.get(snapshot.guildId) ?? null}
+                                    onRewarm={() => rewarmGuild(snapshot.guildId)}
+                                    rewarmDisabled={isManualWarmupRunning || isRunning}
                                     onClear={() => void clearHydrationCacheEntry(snapshot.guildId)}
                                 />
                             ))}

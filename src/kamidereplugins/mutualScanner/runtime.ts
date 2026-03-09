@@ -19,7 +19,9 @@ import type {
 } from "./types";
 import {
     createMutualScannerController,
+    estimateScanRemainingMs,
     executeMutualScan,
+    formatDurationMs,
     makeLocalId,
 } from "./utils";
 
@@ -66,6 +68,7 @@ export interface MutualScannerRuntimeState {
         active: boolean;
         startedAt: number | null;
         scopeLabel: string | null;
+        requestDelayMs: number;
         progress: MutualScannerProgress | null;
         result: MutualScannerExecutionResult | null;
         matches: MutualScannerMatch[];
@@ -87,6 +90,7 @@ const defaultState = (): MutualScannerRuntimeState => ({
         active: false,
         startedAt: null,
         scopeLabel: null,
+        requestDelayMs: 0,
         progress: null,
         result: null,
         matches: [],
@@ -120,20 +124,32 @@ function updateState(updater: (current: MutualScannerRuntimeState) => MutualScan
     notify();
 }
 
-function formatScanPhase(progress: MutualScannerProgress | null, scopeLabel: string | null) {
+function formatScanPhase(
+    progress: MutualScannerProgress | null,
+    scopeLabel: string | null,
+    requestDelayMs: number,
+    startedAt: number | null,
+) {
     if (!progress) {
         return {
             subtitle: scopeLabel ?? "Preparing scan",
-            detail: "0/?",
+            detail: "Preparing candidates",
             progressCurrent: 0,
             progressTotal: null,
         };
     }
 
+    const remainingMs = estimateScanRemainingMs(progress, startedAt, requestDelayMs);
+    const etaDetail = remainingMs != null && progress.phase !== "warming" && progress.phase !== "collecting"
+        ? remainingMs === 0
+            ? "finishing now"
+            : `~${formatDurationMs(remainingMs)} left`
+        : null;
+
     if (progress.phase === "warming") {
         return {
             subtitle: progress.currentLabel ?? "Loading member cache",
-            detail: "warming",
+            detail: "warming cache",
             progressCurrent: progress.scannedCount,
             progressTotal: progress.totalCandidates || null,
         };
@@ -151,7 +167,7 @@ function formatScanPhase(progress: MutualScannerProgress | null, scopeLabel: str
     if (progress.phase === "finishing") {
         return {
             subtitle: "Finalizing run",
-            detail: `${progress.scannedCount}/${progress.totalCandidates || "?"}`,
+            detail: etaDetail ?? `${progress.scannedCount}/${progress.totalCandidates || "?"}`,
             progressCurrent: progress.scannedCount,
             progressTotal: progress.totalCandidates || null,
         };
@@ -159,7 +175,7 @@ function formatScanPhase(progress: MutualScannerProgress | null, scopeLabel: str
 
     return {
         subtitle: progress.currentLabel ?? scopeLabel ?? "Scanning",
-        detail: `${progress.scannedCount}/${progress.totalCandidates || "?"}`,
+        detail: etaDetail ?? `${progress.scannedCount}/${progress.totalCandidates || "?"}`,
         progressCurrent: progress.scannedCount,
         progressTotal: progress.totalCandidates || null,
     };
@@ -171,7 +187,12 @@ function syncScanTask() {
         return;
     }
 
-    const view = formatScanPhase(state.scan.progress, state.scan.scopeLabel);
+    const view = formatScanPhase(
+        state.scan.progress,
+        state.scan.scopeLabel,
+        state.scan.requestDelayMs,
+        state.scan.startedAt,
+    );
     upsertKamidereRuntimeTask({
         id: SCAN_TASK_ID,
         toolId: "mutual-scanner",
@@ -300,6 +321,7 @@ export function startMutualScannerRun(ownerId: string | null, config: MutualScan
             active: true,
             startedAt,
             scopeLabel,
+            requestDelayMs: normalizedConfig.requestDelayMs,
             progress: {
                 phase: "collecting",
                 totalCandidates: 0,
@@ -325,9 +347,10 @@ export function startMutualScannerRun(ownerId: string | null, config: MutualScan
                 updateState(current => ({
                     ...current,
                     scan: {
-                        ...current.scan,
-                        progress: { ...progress },
-                    },
+                ...current.scan,
+                requestDelayMs: normalizedConfig.requestDelayMs,
+                progress: { ...progress },
+            },
                 }));
                 syncScanTask();
             },
@@ -444,8 +467,8 @@ export function startMutualScannerWarmup(
                             warmup: {
                                 ...current.warmup,
                                 status: targetCount != null
-                                    ? `${guildLabel} · ${progress.finalCount}/${targetCount} indexed`
-                                    : `${guildLabel} · ${progress.finalCount} indexed`,
+                                    ? `${guildLabel} / ${progress.finalCount}/${targetCount} indexed`
+                                    : `${guildLabel} / ${progress.finalCount} indexed`,
                                 progress: nextProgress,
                             },
                         }));

@@ -563,6 +563,18 @@
     border-color: rgb(244 189 106 / 26%);
 }
 
+.vc-mutual-scanner-badge.vc-mutual-scanner-success {
+    background: var(--vc-mutual-scanner-success-soft);
+    border-color: rgb(59 165 92 / 24%);
+    color: #c8f1d1;
+}
+
+.vc-mutual-scanner-badge.vc-mutual-scanner-danger {
+    background: var(--vc-mutual-scanner-danger-soft);
+    border-color: rgb(237 66 69 / 24%);
+    color: #ffcbcf;
+}
+
 .vc-mutual-scanner-badge,
 .vc-mutual-scanner-meta-tag {
     gap: 6px;
@@ -994,6 +1006,30 @@
 .vc-mutual-scanner-run-summary-grid {
     margin-top: 16px;
     padding-top: 2px;
+}
+
+.vc-mutual-scanner-run-diff-block {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px 12px;
+    border: 1px solid rgb(255 255 255 / 6%);
+    border-radius: 8px;
+    background: color-mix(in oklab, var(--background-primary) 52%, var(--background-secondary) 48%);
+}
+
+.vc-mutual-scanner-run-diff-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.vc-mutual-scanner-run-diff-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
 }
 
 @keyframes vc-mutual-scanner-spin {

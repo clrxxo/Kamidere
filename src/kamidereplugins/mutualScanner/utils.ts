@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+import type { GuildHydrationSnapshot } from "@shared/kamidere/memberHydrator";
 import { getHydratedGuildMemberIds, hydrateGuildMemberCache } from "@shared/kamidere/memberHydrator";
 import { fetchUserProfile } from "@utils/discord";
 import { sleep } from "@utils/misc";
@@ -16,6 +17,7 @@ import type {
     MutualScannerGuildOption,
     MutualScannerMatch,
     MutualScannerProgress,
+    MutualScannerRun,
     MutualScannerRunStats,
 } from "./types";
 
@@ -25,6 +27,15 @@ interface RawIdentity {
     globalName?: string;
     global_name?: string;
     bot?: boolean;
+}
+
+export type HydrationSnapshotQuality = "complete" | "partial" | "stale" | "cancelled";
+
+export interface MutualScannerRunComparison {
+    previousRun: MutualScannerRun | null;
+    newMatches: MutualScannerMatch[];
+    disappearedMatches: MutualScannerMatch[];
+    sameMatches: MutualScannerMatch[];
 }
 
 const activeControllers = new Set<MutualScannerController>();
@@ -78,6 +89,28 @@ export function formatDurationMs(durationMs: number) {
     return seconds ? `${minutes}m ${seconds}s` : `${minutes}m`;
 }
 
+export function estimateScanRemainingMs(
+    progress: MutualScannerProgress | null,
+    startedAt: number | null,
+    requestDelayMs: number,
+) {
+    if (!progress || !startedAt) return null;
+    if (progress.phase === "warming" || progress.phase === "collecting") return null;
+    if (!progress.totalCandidates || progress.totalCandidates <= 0) return null;
+
+    const remainingCandidates = Math.max(0, progress.totalCandidates - progress.scannedCount);
+    if (remainingCandidates === 0) return 0;
+
+    const elapsedMs = Math.max(0, Date.now() - startedAt);
+    const observedPerCandidateMs = progress.scannedCount > 0
+        ? elapsedMs / progress.scannedCount
+        : 0;
+    const baselinePerCandidateMs = requestDelayMs > 0 ? requestDelayMs + 250 : 850;
+    const estimatedPerCandidateMs = Math.max(baselinePerCandidateMs, observedPerCandidateMs);
+
+    return Math.round(remainingCandidates * estimatedPerCandidateMs);
+}
+
 export function buildGuildOptions() {
     return GuildStore.getGuildsArray()
         .map(guild => {
@@ -93,6 +126,97 @@ export function buildGuildOptions() {
             } satisfies MutualScannerGuildOption;
         })
         .sort((left, right) => left.label.localeCompare(right.label) || left.id.localeCompare(right.id));
+}
+
+function getSnapshotLifetimeMs(snapshot: GuildHydrationSnapshot) {
+    return Math.max(1, snapshot.expiresAt - snapshot.warmedAt);
+}
+
+export function getHydrationSnapshotQuality(
+    snapshot: GuildHydrationSnapshot,
+    targetCount: number | null,
+    now = Date.now(),
+): HydrationSnapshotQuality {
+    if (snapshot.cancelled) {
+        return "cancelled";
+    }
+
+    const incompleteTarget = targetCount != null && snapshot.finalCount < targetCount;
+    if (snapshot.timedOut || snapshot.budgetReached || incompleteTarget) {
+        return "partial";
+    }
+
+    const remainingMs = snapshot.expiresAt - now;
+    const staleThresholdMs = Math.min(12 * 60 * 60 * 1000, Math.round(getSnapshotLifetimeMs(snapshot) * 0.2));
+    if (remainingMs <= staleThresholdMs) {
+        return "stale";
+    }
+
+    return "complete";
+}
+
+export function getHydrationSnapshotQualityLabel(quality: HydrationSnapshotQuality) {
+    switch (quality) {
+        case "cancelled":
+            return "Cancelled";
+        case "partial":
+            return "Partial";
+        case "stale":
+            return "Stale";
+        default:
+            return "Complete";
+    }
+}
+
+export function isHydrationSnapshotWeak(
+    snapshot: GuildHydrationSnapshot | null | undefined,
+    targetCount: number | null,
+    now = Date.now(),
+) {
+    if (!snapshot) return true;
+    return getHydrationSnapshotQuality(snapshot, targetCount, now) !== "complete";
+}
+
+function normalizeScopeGuildIds(run: MutualScannerRun) {
+    return Array.from(new Set(run.configSnapshot.selectedGuildIds)).sort((left, right) => left.localeCompare(right));
+}
+
+export function isComparableMutualScannerRun(left: MutualScannerRun, right: MutualScannerRun) {
+    const leftGuildIds = normalizeScopeGuildIds(left);
+    const rightGuildIds = normalizeScopeGuildIds(right);
+
+    return leftGuildIds.length === rightGuildIds.length
+        && leftGuildIds.every((guildId, index) => guildId === rightGuildIds[index])
+        && left.configSnapshot.includeBots === right.configSnapshot.includeBots
+        && left.configSnapshot.skipExistingFriends === right.configSnapshot.skipExistingFriends
+        && left.configSnapshot.maxMembersPerGuild === right.configSnapshot.maxMembersPerGuild;
+}
+
+export function buildMutualScannerRunComparison(
+    currentRun: MutualScannerRun,
+    previousRun: MutualScannerRun | null,
+): MutualScannerRunComparison {
+    if (!previousRun) {
+        return {
+            previousRun: null,
+            newMatches: [],
+            disappearedMatches: [],
+            sameMatches: [],
+        };
+    }
+
+    const previousMatches = new Map(previousRun.matches.map(match => [match.userId, match]));
+    const currentMatches = new Map(currentRun.matches.map(match => [match.userId, match]));
+    const newMatches = currentRun.matches.filter(match => !previousMatches.has(match.userId));
+    const sameMatches = currentRun.matches.filter(match => previousMatches.has(match.userId));
+    const disappearedMatches = previousRun.matches.filter(match => !currentMatches.has(match.userId));
+
+    return {
+        previousRun,
+        newMatches,
+        disappearedMatches,
+        sameMatches,
+    };
 }
 
 function createEmptyStats(config: MutualScannerConfig): MutualScannerRunStats {
