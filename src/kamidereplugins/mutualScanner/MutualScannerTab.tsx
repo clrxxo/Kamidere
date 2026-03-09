@@ -1,3 +1,9 @@
+/*
+ * Vencord, a Discord client mod
+ * Copyright (c) 2026 Vendicated and contributors
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
 import "./styles.css";
 
 import { BaseText } from "@components/BaseText";
@@ -14,14 +20,22 @@ import { BRAND_ICON_DATA_URL, BRAND_NAME } from "@shared/branding";
 import {
     clearHydratedGuildSnapshot,
     clearHydratedGuildSnapshots,
-    listHydratedGuildSnapshots
+    type GuildHydrationSnapshot,
+    listHydratedGuildSnapshots,
 } from "@shared/kamidere/memberHydrator";
-import type { GuildHydrationSnapshot } from "@shared/kamidere/memberHydrator";
 import { classNameFactory } from "@utils/css";
 import { openUserProfile } from "@utils/discord";
 import { Margins } from "@utils/margins";
 import { Alerts, GuildMemberStore, GuildStore, React, Toasts, useStateFromStores } from "@webpack/common";
 
+import {
+    cancelMutualScannerRun,
+    cancelMutualScannerWarmup,
+    type MutualScannerWarmupProgressState,
+    startMutualScannerRun,
+    startMutualScannerWarmup,
+    useMutualScannerRuntimeState,
+} from "./runtime";
 import {
     clearMutualScannerRuns,
     getMutualScannerCurrentUserId,
@@ -41,14 +55,6 @@ import {
     formatDateTime,
     formatDurationMs,
 } from "./utils";
-import {
-    cancelMutualScannerRun,
-    cancelMutualScannerWarmup,
-    startMutualScannerRun,
-    startMutualScannerWarmup,
-    useMutualScannerRuntimeState,
-} from "./runtime";
-import type { MutualScannerWarmupProgressState } from "./runtime";
 
 const cl = classNameFactory("vc-mutual-scanner-");
 

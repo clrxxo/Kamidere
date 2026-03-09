@@ -1,6 +1,11 @@
+/*
+ * Vencord, a Discord client mod
+ * Copyright (c) 2026 Vendicated and contributors
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
+import type { Channel, EmbedMedia, Message, MessageAttachment } from "@vencord/discord-types";
 import { MessageFlags, MessageReferenceType } from "@vencord/discord-types/enums";
-import type { Channel, CloudUpload, Message, MessageAttachment } from "@vencord/discord-types";
-import type { Embed, EmbedMedia } from "@vencord/discord-types";
 import { ChannelStore, GuildStore } from "@webpack/common";
 
 import type { MediaExtractionInput, SentTrailMediaItem, SentTrailMediaKind, SentTrailRecord, UploadSignatureInput } from "./types";

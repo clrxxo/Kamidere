@@ -1,9 +1,14 @@
+/*
+ * Vencord, a Discord client mod
+ * Copyright (c) 2026 Vendicated and contributors
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
 import type { MessageObject, MessageOptions } from "@api/MessageEvents";
 import { ClockIcon } from "@components/Icons";
 import SettingsPlugin from "@plugins/_core/settings";
 import { Devs } from "@utils/constants";
-import { sleep } from "@utils/misc";
-import { removeFromArray } from "@utils/misc";
+import { removeFromArray, sleep } from "@utils/misc";
 import definePlugin from "@utils/types";
 import { ChannelStore, GuildStore, MessageStore, UserStore } from "@webpack/common";
 

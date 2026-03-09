@@ -1,8 +1,14 @@
+/*
+ * Vencord, a Discord client mod
+ * Copyright (c) 2026 Vendicated and contributors
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
+import { getHydratedGuildMemberIds, hydrateGuildMemberCache } from "@shared/kamidere/memberHydrator";
 import { fetchUserProfile } from "@utils/discord";
 import { sleep } from "@utils/misc";
 import { GuildMemberStore, GuildStore, RelationshipStore, UserProfileStore, UserStore } from "@webpack/common";
 
-import { getHydratedGuildMemberIds, hydrateGuildMemberCache } from "@shared/kamidere/memberHydrator";
 import type {
     MutualScannerConfig,
     MutualScannerController,
@@ -226,8 +232,6 @@ export async function executeMutualScan(
     const matches: MutualScannerMatch[] = [];
     const controller = options?.controller;
     const ownerId = options?.ownerId ?? UserStore.getCurrentUser()?.id ?? null;
-    let candidates: Array<[string, Set<string>]>;
-
     if (config.warmMemberCacheBeforeScan && config.selectedGuildIds.length > 0) {
         for (let index = 0; index < config.selectedGuildIds.length; index++) {
             const guildId = config.selectedGuildIds[index];
@@ -276,7 +280,7 @@ export async function executeMutualScan(
         }
     }
 
-    candidates = Array.from((await collectCandidateMemberships(config, ownerId)).entries());
+    const candidates = Array.from((await collectCandidateMemberships(config, ownerId)).entries());
 
     stats.candidateCount = candidates.length;
     emitProgress(stats, candidates.length, "collecting", undefined, undefined, options?.onProgress);

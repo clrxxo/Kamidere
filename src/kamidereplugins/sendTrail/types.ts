@@ -1,5 +1,10 @@
-import type { CloudUpload } from "@vencord/discord-types";
-import type { Embed, Message, MessageAttachment } from "@vencord/discord-types";
+/*
+ * Vencord, a Discord client mod
+ * Copyright (c) 2026 Vendicated and contributors
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
+import type { CloudUpload, Embed, Message, MessageAttachment } from "@vencord/discord-types";
 
 export type SentTrailMediaKind = "image" | "video";
 export type SentTrailMediaSource = "attachment" | "embed";
