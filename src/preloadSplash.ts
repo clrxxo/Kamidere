@@ -10,6 +10,7 @@ import { KamidereSplashBridge, KamidereSplashStage, KAMIDERE_SPLASH_MAIN_WINDOW_
 const ROOT_ID = "kamidere-loading-screen";
 const STYLE_ID = "kamidere-loading-screen-style";
 const GLYPHS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+const MAX_SPLASH_LIFETIME_MS = 2200;
 const REVEAL_PROGRESS: Record<KamidereSplashStage, number> = {
     [KamidereSplashStage.Preload]: 0.2,
     [KamidereSplashStage.Renderer]: 0.42,
@@ -32,7 +33,6 @@ interface SplashState {
     finishingTimer: number | null;
     fallbackTimer: number | null;
     fallbackPollTimer: number | null;
-    fallbackObserver: MutationObserver | null;
     root: HTMLDivElement | null;
     textNode: HTMLSpanElement | null;
     charNodes: HTMLSpanElement[];
@@ -58,7 +58,7 @@ function getSplashCss() {
             transition:
                 opacity 460ms cubic-bezier(0.22, 1, 0.36, 1),
                 visibility 460ms linear;
-            pointer-events: all;
+            pointer-events: none;
             user-select: none;
         }
 
@@ -273,9 +273,6 @@ function toRevealCount(stage: KamidereSplashStage | `${KamidereSplashStage}`) {
 }
 
 function cleanupFallback(state: SplashState) {
-    state.fallbackObserver?.disconnect();
-    state.fallbackObserver = null;
-
     if (state.fallbackTimer != null) {
         clearTimeout(state.fallbackTimer);
         state.fallbackTimer = null;
@@ -287,6 +284,13 @@ function cleanupFallback(state: SplashState) {
     }
 }
 
+function scheduleBridgeFinish(bridge: KamidereSplashBridge, delayMs = 0) {
+    window.setTimeout(() => {
+        bridge.setStage(KamidereSplashStage.Ready);
+        bridge.finish();
+    }, delayMs);
+}
+
 function startFallbackFinishWatch(state: SplashState, bridge: KamidereSplashBridge) {
     const maybeFinish = () => {
         if (state.finished) return;
@@ -296,29 +300,18 @@ function startFallbackFinishWatch(state: SplashState, bridge: KamidereSplashBrid
 
         if (!hasContent) return;
 
-        bridge.setStage(KamidereSplashStage.Ready);
         cleanupFallback(state);
-        window.setTimeout(() => bridge.finish(), 120);
+        scheduleBridgeFinish(bridge, 80);
     };
-
-    state.fallbackObserver = new MutationObserver(() => {
-        window.setTimeout(maybeFinish, 40);
-    });
-
-    state.fallbackObserver.observe(document.documentElement, {
-        childList: true,
-        subtree: true
-    });
 
     state.fallbackPollTimer = window.setInterval(maybeFinish, 120);
     window.addEventListener("load", maybeFinish, { once: true });
     document.addEventListener("DOMContentLoaded", maybeFinish, { once: true });
     requestAnimationFrame(maybeFinish);
     state.fallbackTimer = window.setTimeout(() => {
-        bridge.setStage(KamidereSplashStage.Ready);
-        bridge.finish();
         cleanupFallback(state);
-    }, 5000);
+        scheduleBridgeFinish(bridge);
+    }, MAX_SPLASH_LIFETIME_MS);
 }
 
 export function shouldInstallKamidereSplash() {
@@ -340,7 +333,6 @@ export function createKamidereSplashBridge(): KamidereSplashBridge {
         finishingTimer: null,
         fallbackTimer: null,
         fallbackPollTimer: null,
-        fallbackObserver: null,
         root: null,
         textNode: null,
         charNodes: []
