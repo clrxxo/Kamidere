@@ -12,7 +12,7 @@ const TASKS_PER_PAGE = 3;
 const DOCK_LAUNCHER_VISUAL_SIZE = 12;
 const DOCK_LAUNCHER_HITBOX_SIZE = 30;
 const DOCK_LAUNCHER_GAP = 4;
-const EMPTY_HUD_HEIGHT = 52;
+const EMPTY_HUD_HEIGHT = 64;
 const HUD_BASE_HEIGHT = 34;
 const HUD_TASK_HEIGHT = 46;
 const HUD_ROW_GAP = 6;
@@ -543,6 +543,7 @@ function KamidereRuntimeHud() {
     const page = Math.min(currentPrefs.page, maxPage);
     const offset = page * TASKS_PER_PAGE;
     const visibleTasks = tasks.slice(offset, offset + TASKS_PER_PAGE);
+    const isEmpty = visibleTasks.length === 0;
     const activePrefs = dragging || resizing ? draftPrefs : currentPrefs;
     const style = {
         transform: `translate3d(${activePrefs.x}px, ${activePrefs.y}px, 0)`,
@@ -684,6 +685,7 @@ function KamidereRuntimeHud() {
             ref={hudRef}
             className={cl(
                 "hud",
+                isEmpty && "hud-empty",
                 hasActiveTasks ? "state-active" : "state-idle",
                 (dragging || resizing) && "hud-interacting",
                 morphState?.mode === "collapse" && "hud-collapsing",

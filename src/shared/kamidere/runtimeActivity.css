@@ -53,6 +53,10 @@
     overflow: hidden;
 }
 
+.vc-kamidere-runtime-hud.vc-kamidere-runtime-hud-empty {
+    min-height: 64px;
+}
+
 .vc-kamidere-runtime-hud.vc-kamidere-runtime-hud-interacting {
     transition: none;
     box-shadow: 0 22px 52px rgb(0 0 0 / 38%);
