@@ -32,6 +32,7 @@ import { coreStyleRootNode, initStyles } from "@api/Styles";
 import { openSettingsTabModal, UpdaterTab } from "@components/settings";
 import { BRAND_NAME } from "@shared/branding";
 import { debounce } from "@shared/debounce";
+import { KamidereSplashStage } from "@shared/kamidereSplash";
 import { IS_WINDOWS } from "@utils/constants";
 import { createAndAppendStyle } from "@utils/css";
 import { StartAt } from "@utils/types";
@@ -51,6 +52,27 @@ import { patches } from "./webpack/patchWebpack";
 
 if (IS_REPORTER) {
     require("./debug/runReporter");
+}
+
+let splashDomReady = document.readyState !== "loading";
+let splashWebpackReady = false;
+let splashFinished = false;
+
+function setKamidereSplashStage(stage: KamidereSplashStage) {
+    window.KamidereSplash?.setStage(stage);
+}
+
+async function finishKamidereSplash() {
+    if (!IS_DISCORD_DESKTOP || splashFinished || !splashDomReady || !splashWebpackReady)
+        return;
+
+    splashFinished = true;
+    setKamidereSplashStage(KamidereSplashStage.Ready);
+
+    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+
+    window.setTimeout(() => window.KamidereSplash?.finish(), 110);
 }
 
 async function syncSettings() {
@@ -206,6 +228,7 @@ function initTrayIpc() {
 
 async function init() {
     await onceReady;
+    setKamidereSplashStage(KamidereSplashStage.WebpackReady);
     startAllPlugins(StartAt.WebpackReady);
 
     syncSettings();
@@ -232,15 +255,22 @@ async function init() {
                 "\n\n" + pendingPatches.map(p => `${p.plugin}: ${p.find}`).join("\n")
             );
     }
+
+    splashWebpackReady = true;
+    void finishKamidereSplash();
 }
 
 initPluginManager();
 initStyles();
+setKamidereSplashStage(KamidereSplashStage.Renderer);
 startAllPlugins(StartAt.Init);
 init();
 
 document.addEventListener("DOMContentLoaded", () => {
     startAllPlugins(StartAt.DOMContentLoaded);
+    setKamidereSplashStage(KamidereSplashStage.DOMReady);
+    splashDomReady = true;
+    void finishKamidereSplash();
 
     // FIXME
     if (IS_DISCORD_DESKTOP && Settings.winNativeTitleBar && IS_WINDOWS) {
