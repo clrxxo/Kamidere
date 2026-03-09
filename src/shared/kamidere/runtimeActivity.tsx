@@ -9,11 +9,19 @@ const cl = classNameFactory("vc-kamidere-runtime-");
 
 const HUD_PREFS_KEY = "kamidere-runtime-activity:v1";
 const TASKS_PER_PAGE = 3;
-const DOCKED_LAUNCHER = {
+const DOCK_LAUNCHER_VISUAL_SIZE = 12;
+const DOCK_LAUNCHER_HITBOX_SIZE = 30;
+const DOCK_LAUNCHER_GAP = 4;
+const DEFAULT_DOCKED_LAUNCHER = {
     x: 48,
     y: 8,
-    size: 22,
+    size: DOCK_LAUNCHER_HITBOX_SIZE,
 };
+const DOCK_ANCHOR_SELECTORS = [
+    ".button__63abb.forward__63abb",
+    ".forward__63abb",
+    "[aria-label='Forward']",
+] as const;
 
 export type KamidereRuntimeTaskStatus = "running" | "completed" | "cancelled" | "failed";
 
@@ -64,6 +72,12 @@ interface HudMorphState {
     active: boolean;
 }
 
+interface DockedLauncherMetrics {
+    x: number;
+    y: number;
+    size: number;
+}
+
 const taskMap = new Map<string, KamidereRuntimeTask>();
 const listeners = new Set<() => void>();
 let prefs = { ...DEFAULT_PREFS };
@@ -82,6 +96,48 @@ function getSortedTasks() {
 
 function getMaxPage(taskCount: number) {
     return Math.max(0, Math.ceil(taskCount / TASKS_PER_PAGE) - 1);
+}
+
+function getDockedLauncherMetrics(): DockedLauncherMetrics {
+    if (typeof document === "undefined") return DEFAULT_DOCKED_LAUNCHER;
+
+    const anchor = DOCK_ANCHOR_SELECTORS
+        .map(selector => document.querySelector(selector))
+        .find(Boolean) as HTMLElement | null;
+
+    if (!anchor) return DEFAULT_DOCKED_LAUNCHER;
+
+    const rect = anchor.getBoundingClientRect();
+    const visualSize = DOCK_LAUNCHER_VISUAL_SIZE;
+    const size = DOCK_LAUNCHER_HITBOX_SIZE;
+
+    return {
+        x: Math.round(rect.right + DOCK_LAUNCHER_GAP),
+        y: Math.round(rect.top + ((rect.height - size) / 2) - 1),
+        size,
+    };
+}
+
+function getHudMountTarget() {
+    if (typeof document === "undefined") return null;
+    return document.querySelector("#app-mount") as HTMLElement | null ?? document.body;
+}
+
+function getMorphGhostInlineStyle(morphState: HudMorphState) {
+    const isCircle = morphState.mode === "expand" ? !morphState.active : morphState.active;
+
+    return {
+        left: 0,
+        top: 0,
+        width: `${morphState.active ? morphState.toWidth : morphState.fromWidth}px`,
+        height: `${morphState.active ? morphState.toHeight : morphState.fromHeight}px`,
+        transform: `translate3d(${morphState.active ? morphState.toX : morphState.fromX}px, ${morphState.active ? morphState.toY : morphState.fromY}px, 0)`,
+        borderRadius: isCircle ? "999px" : "6px",
+        borderColor: isCircle ? "transparent" : undefined,
+        background: isCircle ? "transparent" : undefined,
+        boxShadow: isCircle ? "none" : undefined,
+        opacity: isCircle ? 0.42 : 0.86,
+    } as React.CSSProperties;
 }
 
 function getSnapshot(): RuntimeHudSnapshot {
@@ -158,14 +214,14 @@ export function setKamidereRuntimeHudPrefs(next: Partial<RuntimeHudPrefs>) {
 
 export function mountKamidereRuntimeActivity() {
     if (typeof document === "undefined") return;
-    const { body } = document;
-    if (!body) return;
+    const target = getHudMountTarget();
+    if (!target) return;
 
     mountUsers += 1;
     void loadPrefs();
 
     if (root) {
-        if (mountNode && !mountNode.isConnected) body.appendChild(mountNode);
+        if (mountNode && !mountNode.isConnected) target.appendChild(mountNode);
         return;
     }
 
@@ -173,15 +229,15 @@ export function mountKamidereRuntimeActivity() {
         mountNode = document.createElement("div");
         mountNode.id = "vc-kamidere-runtime-hud-root";
     }
-    if (!mountNode.isConnected) body.appendChild(mountNode);
+    if (!mountNode.isConnected) {
+        target.appendChild(mountNode);
+    }
 
     root = createRoot(mountNode);
     root.render(
-        <div className={cl("hud-root")}>
-            <ErrorBoundary noop>
-                <KamidereRuntimeHud />
-            </ErrorBoundary>
-        </div>,
+        <ErrorBoundary noop>
+            <KamidereRuntimeHud />
+        </ErrorBoundary>,
     );
 }
 
@@ -207,7 +263,7 @@ export function useKamidereRuntimeActivity() {
     return React.useMemo(() => getSnapshot(), [signal]);
 }
 
-function TaskCard({ task }: { task: KamidereRuntimeTask; }) {
+function TaskCard({ task, animate = true }: { task: KamidereRuntimeTask; animate?: boolean; }) {
     const isRunning = task.status === "running";
     const progressPercent = task.progressTotal && task.progressTotal > 0 && task.progressCurrent != null
         ? Math.min(100, Math.max(0, Math.round((task.progressCurrent / task.progressTotal) * 100)))
@@ -217,7 +273,7 @@ function TaskCard({ task }: { task: KamidereRuntimeTask; }) {
         : task.detail ?? "Live";
 
     return (
-        <div className={cl("task", "task-enter")}>
+        <div className={cl("task", animate && "task-enter")}>
             <div className={cl("task-main")}>
                 <div className={cl("task-spinner")} aria-hidden={!isRunning} />
                 <div className={cl("task-copy")}>
@@ -241,10 +297,18 @@ function TaskCard({ task }: { task: KamidereRuntimeTask; }) {
 
 function CloseIcon() {
     return (
-        <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+        <svg width="12" height="12" viewBox="0 0 24 24" aria-hidden="true">
             <path
-                fill="currentColor"
-                d="M18.4 4L12 10.4L5.6 4L4 5.6L10.4 12L4 18.4L5.6 20L12 13.6L18.4 20L20 18.4L13.6 12L20 5.6L18.4 4Z"
+                d="M7 7L17 17"
+                stroke="currentColor"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+            />
+            <path
+                d="M17 7L7 17"
+                stroke="currentColor"
+                strokeWidth="2.2"
+                strokeLinecap="round"
             />
         </svg>
     );
@@ -271,22 +335,68 @@ function LauncherIcon({ spinning = false }: { spinning?: boolean; }) {
     );
 }
 
+function EmptyStateCard() {
+    return (
+        <div className={cl("empty-state")}>
+            <div className={cl("empty-copy")}>
+                <div className={cl("empty-title")}>Nothing running right now</div>
+                <div className={cl("empty-detail")}>Start a tool and it will appear here live.</div>
+            </div>
+        </div>
+    );
+}
+
 function KamidereRuntimeHud() {
     const { tasks, prefs: currentPrefs } = useKamidereRuntimeActivity();
     const [dragging, setDragging] = React.useState(false);
     const [resizing, setResizing] = React.useState(false);
     const [draftPrefs, setDraftPrefs] = React.useState(currentPrefs);
     const [morphState, setMorphState] = React.useState<HudMorphState | null>(null);
+    const [dockMetrics, setDockMetrics] = React.useState<DockedLauncherMetrics>(() => getDockedLauncherMetrics());
+    const [suppressTaskEntrance, setSuppressTaskEntrance] = React.useState(false);
     const dragStartRef = React.useRef<{ pointerX: number; pointerY: number; x: number; y: number; width: number; } | null>(null);
     const draftPrefsRef = React.useRef(currentPrefs);
     const frameRef = React.useRef<number | null>(null);
     const hudRef = React.useRef<HTMLDivElement | null>(null);
+    const previousHasActiveTasksRef = React.useRef<boolean | null>(null);
+    const idleHydrationHandledRef = React.useRef(false);
+
+    const syncDockMetrics = React.useCallback(() => {
+        const next = getDockedLauncherMetrics();
+        setDockMetrics(current => current.x === next.x && current.y === next.y && current.size === next.size ? current : next);
+    }, []);
 
     React.useEffect(() => {
         if (dragging || resizing) return;
         draftPrefsRef.current = currentPrefs;
         setDraftPrefs(currentPrefs);
     }, [currentPrefs, dragging, resizing]);
+
+    React.useEffect(() => {
+        if (typeof document === "undefined") return;
+
+        syncDockMetrics();
+
+        const onWindowChange = () => {
+            syncDockMetrics();
+        };
+        const observer = new MutationObserver(() => {
+            syncDockMetrics();
+        });
+
+        window.addEventListener("resize", onWindowChange);
+        window.addEventListener("scroll", onWindowChange, true);
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true,
+        });
+
+        return () => {
+            window.removeEventListener("resize", onWindowChange);
+            window.removeEventListener("scroll", onWindowChange, true);
+            observer.disconnect();
+        };
+    }, [syncDockMetrics]);
 
     React.useEffect(() => () => {
         if (frameRef.current !== null) {
@@ -305,22 +415,6 @@ function KamidereRuntimeHud() {
             setDraftPrefs(draftPrefsRef.current);
         });
     }, []);
-
-    React.useEffect(() => {
-        if (!morphState?.active) return;
-
-        const timeout = window.setTimeout(() => {
-            if (morphState.mode === "collapse") {
-                setKamidereRuntimeHudPrefs({ hidden: true });
-            } else {
-                setKamidereRuntimeHudPrefs({ hidden: false });
-            }
-
-            setMorphState(null);
-        }, 170);
-
-        return () => window.clearTimeout(timeout);
-    }, [morphState]);
 
     React.useEffect(() => {
         if (!dragging && !resizing) return;
@@ -393,12 +487,12 @@ function KamidereRuntimeHud() {
     };
 
     const dockStyle = {
-        transform: `translate3d(${DOCKED_LAUNCHER.x}px, ${DOCKED_LAUNCHER.y}px, 0)`,
-        width: `${DOCKED_LAUNCHER.size}px`,
-        height: `${DOCKED_LAUNCHER.size}px`,
+        transform: `translate3d(${dockMetrics.x}px, ${dockMetrics.y}px, 0)`,
+        width: `${dockMetrics.size}px`,
+        height: `${dockMetrics.size}px`,
     } as React.CSSProperties;
 
-    if (tasks.length === 0) return null;
+    const hasActiveTasks = tasks.some(task => task.status === "running");
 
     const maxPage = getMaxPage(tasks.length);
     const page = Math.min(currentPrefs.page, maxPage);
@@ -410,37 +504,38 @@ function KamidereRuntimeHud() {
         width: `${activePrefs.width}px`,
     } as React.CSSProperties;
 
-    const startCollapse = () => {
+    const startCollapse = React.useCallback(() => {
         const rect = hudRef.current?.getBoundingClientRect();
         setMorphState({
             mode: "collapse",
             fromX: activePrefs.x,
             fromY: activePrefs.y,
-            toX: DOCKED_LAUNCHER.x,
-            toY: DOCKED_LAUNCHER.y,
+            toX: dockMetrics.x,
+            toY: dockMetrics.y,
             fromWidth: rect?.width ?? activePrefs.width,
-            toWidth: DOCKED_LAUNCHER.size,
+            toWidth: dockMetrics.size,
             fromHeight: rect?.height ?? 78,
-            toHeight: DOCKED_LAUNCHER.size,
+            toHeight: dockMetrics.size,
             active: false,
         });
 
         window.requestAnimationFrame(() => {
             setMorphState(current => current ? { ...current, active: true } : current);
         });
-    };
+    }, [activePrefs.x, activePrefs.y, activePrefs.width, dockMetrics.size, dockMetrics.x, dockMetrics.y]);
 
-    const startExpand = () => {
+    const startExpand = React.useCallback(() => {
+        setSuppressTaskEntrance(true);
         const rect = hudRef.current?.getBoundingClientRect();
         setMorphState({
             mode: "expand",
-            fromX: DOCKED_LAUNCHER.x,
-            fromY: DOCKED_LAUNCHER.y,
+            fromX: dockMetrics.x,
+            fromY: dockMetrics.y,
             toX: currentPrefs.x,
             toY: currentPrefs.y,
-            fromWidth: DOCKED_LAUNCHER.size,
+            fromWidth: dockMetrics.size,
             toWidth: currentPrefs.width,
-            fromHeight: DOCKED_LAUNCHER.size,
+            fromHeight: dockMetrics.size,
             toHeight: rect?.height ?? 86,
             active: false,
         });
@@ -448,56 +543,87 @@ function KamidereRuntimeHud() {
         window.requestAnimationFrame(() => {
             setMorphState(current => current ? { ...current, active: true } : current);
         });
-    };
+    }, [currentPrefs.width, currentPrefs.x, currentPrefs.y, dockMetrics.size, dockMetrics.x, dockMetrics.y]);
+
+    React.useEffect(() => {
+        if (!morphState?.active) return;
+
+        const timeout = window.setTimeout(() => {
+            if (morphState.mode === "collapse") {
+                setKamidereRuntimeHudPrefs({ hidden: true });
+            } else {
+                setKamidereRuntimeHudPrefs({ hidden: false });
+            }
+
+            setMorphState(null);
+        }, 170);
+
+        return () => window.clearTimeout(timeout);
+    }, [morphState]);
+
+    React.useEffect(() => {
+        if (currentPrefs.hidden || morphState) return;
+        if (!suppressTaskEntrance) return;
+
+        const frame = window.requestAnimationFrame(() => {
+            setSuppressTaskEntrance(false);
+        });
+
+        return () => window.cancelAnimationFrame(frame);
+    }, [currentPrefs.hidden, morphState, suppressTaskEntrance]);
+
+    React.useEffect(() => {
+        if (morphState || dragging || resizing) return;
+
+        const previousHasActiveTasks = previousHasActiveTasksRef.current;
+
+        if (!hasActiveTasks && !idleHydrationHandledRef.current) {
+            idleHydrationHandledRef.current = true;
+            if (!currentPrefs.hidden) {
+                setKamidereRuntimeHudPrefs({ hidden: true });
+            }
+        }
+
+        previousHasActiveTasksRef.current = hasActiveTasks;
+    }, [currentPrefs.hidden, dragging, hasActiveTasks, morphState, resizing]);
 
     if (activePrefs.hidden) {
         return (
-            <>
+            <div className={cl("hud-root")}>
                 {!morphState && (
                     <button
                         type="button"
-                        className={cl("launcher")}
+                        className={cl("launcher", hasActiveTasks ? "state-active" : "state-idle")}
                         style={dockStyle}
                         onClick={startExpand}
                         aria-label="Open Kamidere runtime tools"
                     >
-                        <LauncherIcon spinning={tasks.some(task => task.status === "running")} />
+                        <LauncherIcon spinning={hasActiveTasks} />
                     </button>
                 )}
                 {morphState && (
                     <div
-                        className={cl("morph-ghost", morphState.active && "morph-ghost-active")}
-                        style={{
-                            left: 0,
-                            top: 0,
-                            width: `${morphState.active ? morphState.toWidth : morphState.fromWidth}px`,
-                            height: `${morphState.active ? morphState.toHeight : morphState.fromHeight}px`,
-                            transform: `translate3d(${morphState.active ? morphState.toX : morphState.fromX}px, ${morphState.active ? morphState.toY : morphState.fromY}px, 0)`,
-                        }}
+                        className={cl("morph-ghost", hasActiveTasks ? "state-active" : "state-idle", morphState.active && "morph-ghost-active")}
+                        style={getMorphGhostInlineStyle(morphState)}
                     />
                 )}
-            </>
+            </div>
         );
     }
 
     return (
-        <>
+        <div className={cl("hud-root")}>
             {morphState && (
                 <div
-                    className={cl("morph-ghost", morphState.active && "morph-ghost-active")}
-                    style={{
-                        left: 0,
-                        top: 0,
-                        width: `${morphState.active ? morphState.toWidth : morphState.fromWidth}px`,
-                        height: `${morphState.active ? morphState.toHeight : morphState.fromHeight}px`,
-                        transform: `translate3d(${morphState.active ? morphState.toX : morphState.fromX}px, ${morphState.active ? morphState.toY : morphState.fromY}px, 0)`,
-                    }}
+                    className={cl("morph-ghost", hasActiveTasks ? "state-active" : "state-idle", morphState.active && "morph-ghost-active")}
+                    style={getMorphGhostInlineStyle(morphState)}
                 />
             )}
         <div
             ref={hudRef}
             className={cl(
                 "hud",
+                hasActiveTasks ? "state-active" : "state-idle",
                 (dragging || resizing) && "hud-interacting",
                 morphState?.mode === "collapse" && "hud-collapsing",
             )}
@@ -556,12 +682,14 @@ function KamidereRuntimeHud() {
             </div>
 
             <div className={cl("task-row")}>
-                {visibleTasks.map(task => <TaskCard key={task.id} task={task} />)}
+                {visibleTasks.length > 0
+                    ? visibleTasks.map(task => <TaskCard key={task.id} task={task} animate={!suppressTaskEntrance} />)
+                    : <EmptyStateCard />}
             </div>
 
             <div className={cl("resize-edge", "resize-edge-right")} onPointerDown={startResize} />
         </div>
-        </>
+        </div>
     );
 }
 

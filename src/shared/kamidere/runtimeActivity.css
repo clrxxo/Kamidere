@@ -6,10 +6,37 @@
 }
 
 .vc-kamidere-runtime-hud,
-.vc-kamidere-runtime-launcher {
+.vc-kamidere-runtime-launcher,
+.vc-kamidere-runtime-morph-ghost {
     position: absolute;
-    pointer-events: auto;
     will-change: transform;
+    --runtime-accent: var(--green-360, #3ba55c);
+    --runtime-border: rgb(59 165 92 / 28%);
+    --runtime-border-soft: rgb(59 165 92 / 14%);
+    --runtime-surface: color-mix(in oklab, var(--background-base-low) 88%, #163620 12%);
+    --runtime-surface-soft: rgb(255 255 255 / 2%);
+    --runtime-accent-soft: rgb(59 165 92 / 16%);
+    --runtime-accent-strong: #baf5c8;
+    --runtime-muted: color-mix(in srgb, var(--green-360, #3ba55c) 82%, white 18%);
+}
+
+.vc-kamidere-runtime-hud.vc-kamidere-runtime-state-idle,
+.vc-kamidere-runtime-launcher.vc-kamidere-runtime-state-idle,
+.vc-kamidere-runtime-morph-ghost.vc-kamidere-runtime-state-idle {
+    --runtime-accent: color-mix(in srgb, var(--interactive-normal, #b5bac1) 84%, white 16%);
+    --runtime-border: rgb(255 255 255 / 12%);
+    --runtime-border-soft: rgb(255 255 255 / 8%);
+    --runtime-surface: color-mix(in oklab, var(--background-base-low) 95%, #6b7280 5%);
+    --runtime-surface-soft: rgb(255 255 255 / 1.5%);
+    --runtime-accent-soft: rgb(255 255 255 / 10%);
+    --runtime-accent-strong: #eef1f5;
+    --runtime-muted: color-mix(in srgb, var(--interactive-normal, #b5bac1) 82%, white 18%);
+}
+
+.vc-kamidere-runtime-hud,
+.vc-kamidere-runtime-launcher {
+    pointer-events: auto;
+    -webkit-app-region: no-drag;
 }
 
 .vc-kamidere-runtime-hud {
@@ -17,12 +44,12 @@
     flex-direction: column;
     gap: 6px;
     padding: 8px;
-    border: 1px solid rgb(59 165 92 / 28%);
+    border: 1px solid var(--runtime-border);
     border-radius: 6px;
-    background: color-mix(in oklab, var(--background-base-low) 88%, #163620 12%);
+    background: var(--runtime-surface);
     box-shadow: 0 18px 44px rgb(0 0 0 / 34%);
     backdrop-filter: blur(12px);
-    transition: opacity 140ms ease, transform 140ms ease, box-shadow 140ms ease;
+    transition: opacity 140ms ease, transform 140ms ease, box-shadow 140ms ease, border-color 180ms ease, background 180ms ease;
     overflow: hidden;
 }
 
@@ -39,21 +66,24 @@
 .vc-kamidere-runtime-launcher {
     display: inline-flex;
     align-items: center;
-    justify-content: center;
-    width: 22px;
-    height: 22px;
+    justify-content: flex-start;
+    width: 30px;
+    height: 30px;
     border: 0;
-    border-radius: 4px;
+    border-radius: 0;
     background: transparent;
-    color: var(--green-360, #3ba55c);
+    color: var(--runtime-accent);
     box-shadow: none;
-    transition: transform 140ms ease, background-color 140ms ease, color 140ms ease;
+    cursor: pointer;
+    padding: 0 0 0 4px;
+    overflow: visible;
+    transition: transform 140ms ease, color 140ms ease, opacity 140ms ease;
 }
 
 .vc-kamidere-runtime-launcher:hover {
     transform: translateY(-1px);
-    background: rgb(59 165 92 / 12%);
-    color: #8de5a8;
+    color: var(--runtime-accent-strong);
+    background: transparent;
 }
 
 .vc-kamidere-runtime-launcher-icon {
@@ -69,9 +99,10 @@
     width: 12px;
     height: 12px;
     border-radius: 999px;
-    background: conic-gradient(from 90deg, rgb(59 165 92 / 10%), rgb(59 165 92 / 18%), var(--green-360, #3ba55c), rgb(59 165 92 / 18%));
+    background: conic-gradient(from 90deg, color-mix(in srgb, var(--runtime-accent) 12%, transparent), color-mix(in srgb, var(--runtime-accent) 24%, transparent), var(--runtime-accent), color-mix(in srgb, var(--runtime-accent) 24%, transparent));
     -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 0);
     mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 0);
+    transition: background 180ms ease;
 }
 
 .vc-kamidere-runtime-launcher-icon.vc-kamidere-runtime-launcher-icon-spinning .vc-kamidere-runtime-launcher-icon-ring {
@@ -102,9 +133,10 @@
     width: 8px;
     height: 8px;
     border-radius: 999px;
-    background: var(--green-360, #3ba55c);
-    box-shadow: 0 0 0 3px rgb(59 165 92 / 18%);
+    background: var(--runtime-accent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--runtime-accent) 20%, transparent);
     flex: 0 0 8px;
+    transition: background 180ms ease, box-shadow 180ms ease;
 }
 
 .vc-kamidere-runtime-title {
@@ -130,17 +162,18 @@
     width: 16px;
     height: 16px;
     border: 0;
-    border-radius: 4px;
+    border-radius: 999px;
     background: transparent;
-    color: color-mix(in srgb, var(--green-360, #3ba55c) 78%, white 22%);
+    color: var(--runtime-muted);
     cursor: pointer;
     padding: 0;
-    transition: background-color 140ms ease, color 140ms ease;
+    transition: background-color 140ms ease, color 140ms ease, box-shadow 140ms ease;
 }
 
 .vc-kamidere-runtime-header-button:hover {
-    background: rgb(59 165 92 / 12%);
-    color: #9ce7b2;
+    background: var(--runtime-accent-soft);
+    color: var(--runtime-accent-strong);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--runtime-accent) 20%, transparent);
 }
 
 .vc-kamidere-runtime-header-button:disabled {
@@ -158,8 +191,8 @@
     min-width: 0;
     padding: 8px 10px;
     border-radius: 6px;
-    background: rgb(255 255 255 / 2%);
-    border: 1px solid rgb(59 165 92 / 14%);
+    background: var(--runtime-surface-soft);
+    border: 1px solid var(--runtime-border-soft);
     transition: opacity 140ms ease, transform 140ms ease, border-color 140ms ease;
 }
 
@@ -179,7 +212,7 @@
     height: 15px;
     flex: 0 0 15px;
     border-radius: 999px;
-    background: conic-gradient(from 90deg, rgb(59 165 92 / 10%), rgb(59 165 92 / 18%), var(--green-360, #3ba55c), rgb(59 165 92 / 18%));
+    background: conic-gradient(from 90deg, color-mix(in srgb, var(--runtime-accent) 12%, transparent), color-mix(in srgb, var(--runtime-accent) 24%, transparent), var(--runtime-accent), color-mix(in srgb, var(--runtime-accent) 24%, transparent));
     -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 0);
     mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 0);
     animation: vc-kamidere-runtime-spin 0.78s linear infinite;
@@ -246,8 +279,35 @@
     position: absolute;
     inset: 0 auto 0 0;
     border-radius: inherit;
-    background: var(--green-360, #3ba55c);
+    background: var(--runtime-accent);
     transition: width 160ms ease;
+}
+
+.vc-kamidere-runtime-empty-state {
+    display: block;
+    min-width: 0;
+    padding: 2px 0 0;
+}
+
+.vc-kamidere-runtime-empty-copy {
+    min-width: 0;
+}
+
+.vc-kamidere-runtime-empty-title {
+    color: var(--text-strong);
+    font-size: 0.72rem;
+    font-weight: 600;
+    line-height: 1.1;
+}
+
+.vc-kamidere-runtime-empty-detail {
+    margin-top: 2px;
+    color: var(--text-muted);
+    font-size: 0.62rem;
+    line-height: 1.15;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .vc-kamidere-runtime-resize-edge {
@@ -260,17 +320,20 @@
 }
 
 .vc-kamidere-runtime-morph-ghost {
-    position: absolute;
     pointer-events: none;
-    border: 1px solid rgb(59 165 92 / 28%);
+    border: 1px solid var(--runtime-border);
     border-radius: 6px;
-    background: color-mix(in oklab, var(--background-base-low) 88%, #163620 12%);
+    background: var(--runtime-surface);
     box-shadow: 0 18px 44px rgb(0 0 0 / 34%);
     opacity: 0.92;
     transition:
         transform 170ms cubic-bezier(0.22, 0.8, 0.32, 1),
         width 170ms cubic-bezier(0.22, 0.8, 0.32, 1),
         height 170ms cubic-bezier(0.22, 0.8, 0.32, 1),
+        border-radius 170ms cubic-bezier(0.22, 0.8, 0.32, 1),
+        background 170ms ease,
+        border-color 170ms ease,
+        box-shadow 170ms ease,
         opacity 170ms ease;
 }
 

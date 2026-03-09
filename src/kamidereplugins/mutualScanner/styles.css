@@ -313,19 +313,31 @@
     padding: 0 12px;
     border: 1px solid var(--vc-mutual-scanner-border);
     border-radius: 8px;
-    background: color-mix(in oklab, var(--background-primary) 58%, var(--background-secondary) 42%);
+    background: color-mix(in oklab, var(--background-primary) 58%, var(--background-secondary) 42%) !important;
+    background-color: color-mix(in oklab, var(--background-primary) 58%, var(--background-secondary) 42%) !important;
     box-shadow: inset 0 1px 0 rgb(255 255 255 / 3%);
+    appearance: textfield;
+    -moz-appearance: textfield;
+}
+
+.vc-mutual-scanner-input[type="number"]::-webkit-outer-spin-button,
+.vc-mutual-scanner-input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
 }
 
 .vc-mutual-scanner-field {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    justify-content: space-between;
+    height: 100%;
+    gap: 10px;
 }
 
 .vc-mutual-scanner-field-label {
     font-size: 0.78rem;
     font-weight: 700;
+    line-height: 1.15;
     letter-spacing: 0.05em;
     text-transform: uppercase;
 }

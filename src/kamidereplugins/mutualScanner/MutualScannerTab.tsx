@@ -1089,6 +1089,7 @@ function MutualScannerTab() {
                             <label className={cl("field")}>
                                 <span className={cl("field-label")}>Warmup timeout per server (ms)</span>
                                 <input
+                                    className={cl("input")}
                                     type="number"
                                     min={500}
                                     max={20000}

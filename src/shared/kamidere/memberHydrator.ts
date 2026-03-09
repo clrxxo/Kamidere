@@ -5,7 +5,8 @@ import { findByPropsLazy } from "@webpack";
 import { FluxDispatcher, GuildMemberStore, SnowflakeUtils } from "@webpack/common";
 
 const logger = new Logger("KamidereMemberHydrator");
-const GuildActions = findByPropsLazy("requestMembersById", "banUser") as {
+const GuildActions = findByPropsLazy("requestMembers", "requestMembersById") as {
+    requestMembers?: (guildId: string, query?: string, limit?: number, includePresences?: boolean) => void;
     requestMembersById?: (guildId: string, userIds: string[], includePresences?: boolean) => void;
 };
 
@@ -18,6 +19,7 @@ const WARMUP_QUERY_FANOUT = [
 ];
 const WARMUP_QUERY_LIMIT = 100;
 const WARMUP_QUERY_MAX_DEPTH = 3;
+const WARMUP_MAX_STALLED_PASSES = 2;
 
 export interface GuildHydrationBudget {
     maxWaitMs?: number;
@@ -380,6 +382,9 @@ export async function hydrateGuildMemberCache(guildId: string, options: GuildHyd
         let budgetReached = false;
         const queryQueue = [...WARMUP_QUERY_FANOUT];
         const queuedQueries = new Set(queryQueue);
+        let stalledPasses = 0;
+        let passBaselineCount = initialCount;
+        let passBaselineChunks = 0;
         const activeProbes = new Map<string, {
             query: string;
             hits: number;
@@ -491,12 +496,19 @@ export async function hydrateGuildMemberCache(guildId: string, options: GuildHyd
                     expanded: false,
                 });
 
+                if (!query && typeof GuildActions?.requestMembers === "function") {
+                    GuildActions.requestMembers(guildId, query, limit, false);
+                    return;
+                }
+
                 FluxDispatcher.dispatch({
                     type: "GUILD_MEMBERS_REQUEST",
+                    guildId,
                     guildIds: [guildId],
                     query,
                     limit,
                     presences: false,
+                    includePresences: false,
                     nonce,
                 });
             } catch (error) {
@@ -506,6 +518,10 @@ export async function hydrateGuildMemberCache(guildId: string, options: GuildHyd
         };
 
         const dispatchNextWarmupProbe = () => {
+            if (activeProbes.size > 0) {
+                return false;
+            }
+
             const query = queryQueue.shift();
             if (query == null) {
                 return false;
@@ -513,6 +529,26 @@ export async function hydrateGuildMemberCache(guildId: string, options: GuildHyd
 
             dispatchWarmupRequest(query);
             return true;
+        };
+
+        const getFallbackProbe = () => {
+            if (activeProbes.size !== 1) return null;
+            return Array.from(activeProbes.values())[0] ?? null;
+        };
+
+        const updateProbeProgress = (event: any, now: number) => {
+            const nonce = getChunkNonce(event);
+            const directProbe = nonce ? activeProbes.get(nonce) : null;
+            const probe = directProbe ?? getFallbackProbe();
+            if (!probe) return;
+
+            probe.hits += getChunkMemberHitCount(event);
+            probe.lastEventAt = now;
+
+            if (!probe.expanded && probe.query && probe.hits >= WARMUP_QUERY_LIMIT) {
+                enqueueProbeChildren(probe.query);
+                probe.expanded = true;
+            }
         };
 
         const trimFinishedProbes = (now: number) => {
@@ -536,6 +572,9 @@ export async function hydrateGuildMemberCache(guildId: string, options: GuildHyd
                 queryQueue.push(query);
                 queuedQueries.add(query);
             }
+
+            passBaselineCount = lastCount;
+            passBaselineChunks = chunksSeen;
         };
 
         const updateCount = () => {
@@ -553,19 +592,7 @@ export async function hydrateGuildMemberCache(guildId: string, options: GuildHyd
             const chunkGuildId = getChunkGuildId(event);
             if (chunkGuildId && chunkGuildId !== guildId) return;
 
-            const nonce = getChunkNonce(event);
-            if (nonce) {
-                const probe = activeProbes.get(nonce);
-                if (probe) {
-                    probe.hits += getChunkMemberHitCount(event);
-                    probe.lastEventAt = Date.now();
-
-                    if (!probe.expanded && probe.query && probe.hits >= WARMUP_QUERY_LIMIT) {
-                        enqueueProbeChildren(probe.query);
-                        probe.expanded = true;
-                    }
-                }
-            }
+            updateProbeProgress(event, Date.now());
 
             chunksSeen++;
             lastProgressAt = Date.now();
@@ -583,19 +610,7 @@ export async function hydrateGuildMemberCache(guildId: string, options: GuildHyd
 
             const now = Date.now();
             for (const chunk of relevantChunks) {
-                const nonce = getChunkNonce(chunk);
-                if (!nonce) continue;
-
-                const probe = activeProbes.get(nonce);
-                if (!probe) continue;
-
-                probe.hits += getChunkMemberHitCount(chunk);
-                probe.lastEventAt = now;
-
-                if (!probe.expanded && probe.query && probe.hits >= WARMUP_QUERY_LIMIT) {
-                    enqueueProbeChildren(probe.query);
-                    probe.expanded = true;
-                }
+                updateProbeProgress(chunk, now);
             }
 
             chunksSeen += relevantChunks.length;
@@ -646,7 +661,7 @@ export async function hydrateGuildMemberCache(guildId: string, options: GuildHyd
                     break;
                 }
 
-                if (queryQueue.length > 0 && now - lastRequestAt >= 500) {
+                if (queryQueue.length > 0 && activeProbes.size === 0 && now - lastRequestAt >= 140) {
                     dispatchNextWarmupProbe();
                 }
 
@@ -656,6 +671,17 @@ export async function hydrateGuildMemberCache(guildId: string, options: GuildHyd
                 }
 
                 if (continueUntilTarget && targetCount != null && lastCount < targetCount && queryQueue.length === 0 && activeProbes.size === 0) {
+                    const madeProgressThisPass = lastCount > passBaselineCount || chunksSeen > passBaselineChunks;
+                    if (!madeProgressThisPass) {
+                        stalledPasses += 1;
+                        if (stalledPasses >= WARMUP_MAX_STALLED_PASSES) {
+                            timedOut = true;
+                            break;
+                        }
+                    } else {
+                        stalledPasses = 0;
+                    }
+
                     resetProbeQueue();
                     lastProgressAt = now;
                     continue;

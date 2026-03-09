@@ -5,6 +5,7 @@ import { Button, TextButton } from "@components/Button";
 import { Card } from "@components/Card";
 import { Heading, HeadingTertiary } from "@components/Heading";
 import { CogWheel, DeleteIcon, LogIcon, MagnifyingGlassIcon, OpenExternalIcon } from "@components/Icons";
+import { removeKamidereRuntimeTask, upsertKamidereRuntimeTask } from "@shared/kamidere/runtimeActivity";
 import { Notice } from "@components/Notice";
 import { Paragraph } from "@components/Paragraph";
 import { SettingsTab, wrapTab } from "@components/settings";
@@ -28,6 +29,7 @@ const PURGE_STATUS_HIDE_DELAY_MS = 2400;
 const PURGE_STATUS_TRANSITION_MS = 280;
 const DEFAULT_PAGE_SIZE: PageSizeValue = "5";
 const INPUT_TEXT_COLOR = "var(--text-normal, var(--header-primary, #f2f3f5))";
+const PURGE_RUNTIME_TASK_ID = "kamidere-send-trail:purge";
 
 const HERO_BACKGROUND = `data:image/svg+xml;utf8,${encodeURIComponent(
     [
@@ -110,6 +112,50 @@ function makeEmptyPurgeStatus(): PurgeStatusState {
         failed: 0,
         skipped: 0,
     };
+}
+
+function syncPurgeRuntimeTask(status: PurgeStatusState, startedAt: number) {
+    if (status.phase === "idle") {
+        removeKamidereRuntimeTask(PURGE_RUNTIME_TASK_ID);
+        return;
+    }
+
+    const isRunning = status.phase === "running";
+    const subtitle = isRunning
+        ? status.currentLabel
+            ? `Deleting ${status.currentLabel}`
+            : "Purging queued messages"
+        : status.phase === "success"
+            ? `Deleted ${status.deleted} message${status.deleted === 1 ? "" : "s"}`
+            : status.phase === "partial"
+                ? `Deleted ${status.deleted}, failed ${status.failed}`
+                : status.skipped > 0
+                    ? `${status.skipped} protected entr${status.skipped === 1 ? "y skipped" : "ies skipped"}`
+                    : "No messages could be deleted";
+
+    const detail = status.total > 0
+        ? `${status.processed}/${status.total}`
+        : status.deleted > 0
+            ? `${status.deleted} deleted`
+            : status.failed > 0
+                ? `${status.failed} failed`
+                : "idle";
+
+    upsertKamidereRuntimeTask({
+        id: PURGE_RUNTIME_TASK_ID,
+        toolId: "send-trail-purge",
+        name: "Send Trail Purge",
+        status: isRunning
+            ? "running"
+            : status.phase === "failure"
+                ? "failed"
+                : "completed",
+        subtitle,
+        detail,
+        progressCurrent: status.total > 0 ? status.processed : undefined,
+        progressTotal: status.total > 0 ? status.total : null,
+        startedAt,
+    });
 }
 
 function shouldIgnoreRecordToggle(target: HTMLElement | null) {
@@ -830,11 +876,15 @@ function SendTrailTab() {
     const purgeStatusTimerRef = React.useRef<number | null>(null);
     const purgeStatusExitTimerRef = React.useRef<number | null>(null);
     const purgeStatusFrameRef = React.useRef<number | null>(null);
+    const purgeRuntimeTimerRef = React.useRef<number | null>(null);
+    const purgeRuntimeStartedAtRef = React.useRef<number | null>(null);
+    const isMountedRef = React.useRef(true);
     const historyFooterRef = React.useRef<HTMLDivElement | null>(null);
     const keepFooterVisibleRef = React.useRef(false);
 
     React.useEffect(() => {
         return () => {
+            isMountedRef.current = false;
             if (purgeStatusTimerRef.current) {
                 window.clearTimeout(purgeStatusTimerRef.current);
             }
@@ -845,6 +895,25 @@ function SendTrailTab() {
                 window.cancelAnimationFrame(purgeStatusFrameRef.current);
             }
         };
+    }, []);
+
+    const clearPurgeRuntimeTask = React.useCallback((delayMs = 0) => {
+        if (purgeRuntimeTimerRef.current) {
+            window.clearTimeout(purgeRuntimeTimerRef.current);
+            purgeRuntimeTimerRef.current = null;
+        }
+
+        if (delayMs <= 0) {
+            return;
+        }
+
+        if (delayMs > 0) {
+            purgeRuntimeTimerRef.current = window.setTimeout(() => {
+                removeKamidereRuntimeTask(PURGE_RUNTIME_TASK_ID);
+                purgeRuntimeStartedAtRef.current = null;
+                purgeRuntimeTimerRef.current = null;
+            }, delayMs);
+        }
     }, []);
 
     React.useEffect(() => {
@@ -913,6 +982,28 @@ function SendTrailTab() {
             return next;
         });
     }, []);
+
+    const publishPurgeRuntimeStatus = React.useCallback((status: PurgeStatusState, startedAt?: number) => {
+        const effectiveStartedAt = startedAt ?? purgeRuntimeStartedAtRef.current ?? Date.now();
+        purgeRuntimeStartedAtRef.current = effectiveStartedAt;
+
+        syncPurgeRuntimeTask(status, effectiveStartedAt);
+
+        if (status.phase === "running") {
+            clearPurgeRuntimeTask();
+            return;
+        }
+
+        clearPurgeRuntimeTask(PURGE_STATUS_HIDE_DELAY_MS + PURGE_STATUS_TRANSITION_MS);
+    }, [clearPurgeRuntimeTask]);
+
+    const applyPurgeStatus = React.useCallback((status: PurgeStatusState, startedAt?: number) => {
+        publishPurgeRuntimeStatus(status, startedAt);
+
+        if (isMountedRef.current) {
+            setPurgeStatus(status);
+        }
+    }, [publishPurgeRuntimeStatus]);
 
     const scopeOptions = React.useMemo<SelectOption<ScopeValue>[]>(() => {
         const guilds = new Map<string, string>();
@@ -1107,14 +1198,20 @@ function SendTrailTab() {
             window.clearTimeout(purgeStatusTimerRef.current);
             purgeStatusTimerRef.current = null;
         }
+        if (purgeRuntimeTimerRef.current) {
+            window.clearTimeout(purgeRuntimeTimerRef.current);
+            purgeRuntimeTimerRef.current = null;
+        }
 
         const eligibleRecords = targetRecords.filter(record =>
             !isRecordProtected(record, purgeTarget, purgeConfig.protectAllDms, protectedDmChannels, protectedDmUserIds),
         );
         const skipped = targetRecords.length - eligibleRecords.length;
+        const startedAt = Date.now();
+        purgeRuntimeStartedAtRef.current = startedAt;
 
         if (eligibleRecords.length === 0) {
-            setPurgeStatus({
+            const nextStatus = {
                 phase: "failure",
                 total: 0,
                 processed: 0,
@@ -1122,7 +1219,8 @@ function SendTrailTab() {
                 failed: 0,
                 skipped,
                 currentLabel: undefined,
-            });
+            } satisfies PurgeStatusState;
+            applyPurgeStatus(nextStatus, startedAt);
             showToast("Nothing in the current purge target is allowed by your purge config.", Toasts.Type.FAILURE);
             return;
         }
@@ -1130,7 +1228,7 @@ function SendTrailTab() {
         let deleted = 0;
         let failed = 0;
 
-        setPurgeStatus({
+        const runningStatus = {
             phase: "running",
             total: eligibleRecords.length,
             processed: 0,
@@ -1138,16 +1236,24 @@ function SendTrailTab() {
             failed: 0,
             skipped,
             currentLabel: undefined,
-        });
+        } satisfies PurgeStatusState;
+        applyPurgeStatus(runningStatus, startedAt);
 
         for (const [index, record] of eligibleRecords.entries()) {
             const context = resolveRecordContext(record);
+            const currentLabel = context.isDirectMessage ? context.channelName : `#${context.channelName}`;
 
             updateDeletingId(record.id, true);
-            setPurgeStatus(current => ({
-                ...current,
-                currentLabel: context.isDirectMessage ? context.channelName : `#${context.channelName}`,
-            }));
+            const currentStatus = {
+                phase: "running",
+                total: eligibleRecords.length,
+                processed: index,
+                deleted,
+                failed,
+                skipped,
+                currentLabel,
+            } satisfies PurgeStatusState;
+            applyPurgeStatus(currentStatus, startedAt);
 
             try {
                 await MessageActions.deleteMessage(record.channelId, record.messageId);
@@ -1164,12 +1270,16 @@ function SendTrailTab() {
                 failed++;
             } finally {
                 updateDeletingId(record.id, false);
-                setPurgeStatus(current => ({
-                    ...current,
+                const progressStatus = {
+                    phase: "running",
+                    total: eligibleRecords.length,
                     processed: index + 1,
                     deleted,
                     failed,
-                }));
+                    skipped,
+                    currentLabel,
+                } satisfies PurgeStatusState;
+                applyPurgeStatus(progressStatus, startedAt);
             }
 
             if (index < eligibleRecords.length - 1) {
@@ -1183,7 +1293,7 @@ function SendTrailTab() {
                 ? "partial"
                 : "failure";
 
-        setPurgeStatus({
+        const finishedStatus = {
             phase,
             total: eligibleRecords.length,
             processed: eligibleRecords.length,
@@ -1191,7 +1301,8 @@ function SendTrailTab() {
             failed,
             skipped,
             currentLabel: undefined,
-        });
+        } satisfies PurgeStatusState;
+        applyPurgeStatus(finishedStatus, startedAt);
 
         if (phase === "success") {
             showToast(`Purged ${deleted} message${deleted === 1 ? "" : "s"} from Discord.`, Toasts.Type.SUCCESS);
@@ -1200,7 +1311,7 @@ function SendTrailTab() {
         } else {
             showToast("No selected messages could be purged from Discord.", Toasts.Type.FAILURE);
         }
-    }, [currentUserId, protectedDmChannels, protectedDmUserIds, purgeConfig.protectAllDms, purgeTarget, updateDeletingId]);
+    }, [applyPurgeStatus, currentUserId, protectedDmChannels, protectedDmUserIds, purgeConfig.protectAllDms, purgeTarget, updateDeletingId]);
 
     const confirmPurge = React.useCallback(() => {
         if (purgeActionRecords.length === 0) return;
