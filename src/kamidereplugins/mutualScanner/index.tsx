@@ -1,6 +1,9 @@
 import { MagnifyingGlassIcon } from "@components/Icons";
 import SettingsPlugin from "@plugins/_core/settings";
-import { unmountKamidereRuntimeActivity } from "@shared/kamidere/runtimeActivity";
+import {
+    mountKamidereRuntimeActivity,
+    unmountKamidereRuntimeActivity,
+} from "@shared/kamidere/runtimeActivity";
 import { Devs } from "@utils/constants";
 import { removeFromArray } from "@utils/misc";
 import definePlugin from "@utils/types";
@@ -51,6 +54,7 @@ export default definePlugin({
     },
 
     start() {
+        mountKamidereRuntimeActivity();
         registerMutualScannerSettingsTab();
     },
 

@@ -89,7 +89,6 @@ let prefsLoaded = false;
 let mountNode: HTMLDivElement | null = null;
 let root: ReturnType<typeof createRoot> | null = null;
 let mountUsers = 0;
-let autoUnmountTimer: number | null = null;
 
 function clampWidth(width: number) {
     return Math.max(220, Math.min(420, width));
@@ -196,12 +195,6 @@ function persistPrefs() {
     void DataStore.set(HUD_PREFS_KEY, prefs);
 }
 
-function clearAutoUnmountTimer() {
-    if (autoUnmountTimer === null) return;
-    window.clearTimeout(autoUnmountTimer);
-    autoUnmountTimer = null;
-}
-
 export function subscribeKamidereRuntimeActivity(listener: () => void) {
     listeners.add(listener);
     return () => {
@@ -213,8 +206,6 @@ export function upsertKamidereRuntimeTask(task: Omit<KamidereRuntimeTask, "updat
     if (!root) {
         mountKamidereRuntimeActivity();
     }
-
-    clearAutoUnmountTimer();
     taskMap.set(task.id, {
         ...task,
         updatedAt: task.updatedAt ?? Date.now(),
@@ -242,7 +233,6 @@ export function mountKamidereRuntimeActivity() {
     const target = getHudMountTarget();
     if (!target) return;
 
-    clearAutoUnmountTimer();
     mountUsers += 1;
     void loadPrefs();
 
@@ -268,7 +258,6 @@ export function mountKamidereRuntimeActivity() {
 }
 
 export function unmountKamidereRuntimeActivity() {
-    clearAutoUnmountTimer();
     mountUsers = Math.max(0, mountUsers - 1);
     if (mountUsers > 0) return;
 
@@ -288,20 +277,6 @@ export function useKamidereRuntimeActivity() {
     }, []);
 
     return React.useMemo(() => getSnapshot(), [signal]);
-}
-
-export function scheduleKamidereRuntimeAutoUnmount(delayMs = 280) {
-    if (typeof window === "undefined") return;
-    clearAutoUnmountTimer();
-
-    autoUnmountTimer = window.setTimeout(() => {
-        autoUnmountTimer = null;
-        if (taskMap.size > 0 || !prefs.hidden || !root) {
-            return;
-        }
-
-        unmountKamidereRuntimeActivity();
-    }, delayMs);
 }
 
 function TaskCard({ task, animate = true }: { task: KamidereRuntimeTask; animate?: boolean; }) {
@@ -393,6 +368,7 @@ function EmptyStateCard() {
 
 function KamidereRuntimeHud() {
     const { tasks, prefs: currentPrefs } = useKamidereRuntimeActivity();
+    const hasActiveTasks = tasks.some(task => task.status === "running");
     const [dragging, setDragging] = React.useState(false);
     const [resizing, setResizing] = React.useState(false);
     const [draftPrefs, setDraftPrefs] = React.useState(currentPrefs);
@@ -405,6 +381,7 @@ function KamidereRuntimeHud() {
     const hudRef = React.useRef<HTMLDivElement | null>(null);
     const previousHasActiveTasksRef = React.useRef<boolean | null>(null);
     const idleHydrationHandledRef = React.useRef(false);
+    const shouldTrackDockAggressively = !currentPrefs.hidden || hasActiveTasks || morphState != null;
 
     const syncDockMetrics = React.useCallback(() => {
         const next = getDockedLauncherMetrics();
@@ -425,11 +402,19 @@ function KamidereRuntimeHud() {
         const onWindowChange = () => {
             syncDockMetrics();
         };
+
+        window.addEventListener("resize", onWindowChange);
+
+        if (!shouldTrackDockAggressively) {
+            return () => {
+                window.removeEventListener("resize", onWindowChange);
+            };
+        }
+
         const observer = new MutationObserver(() => {
             syncDockMetrics();
         });
 
-        window.addEventListener("resize", onWindowChange);
         window.addEventListener("scroll", onWindowChange, true);
         observer.observe(document.body, {
             childList: true,
@@ -441,7 +426,7 @@ function KamidereRuntimeHud() {
             window.removeEventListener("scroll", onWindowChange, true);
             observer.disconnect();
         };
-    }, [syncDockMetrics]);
+    }, [shouldTrackDockAggressively, syncDockMetrics]);
 
     React.useEffect(() => () => {
         if (frameRef.current !== null) {
@@ -536,8 +521,6 @@ function KamidereRuntimeHud() {
         width: `${dockMetrics.size}px`,
         height: `${dockMetrics.size}px`,
     } as React.CSSProperties;
-
-    const hasActiveTasks = tasks.some(task => task.status === "running");
 
     const maxPage = getMaxPage(tasks.length);
     const page = Math.min(currentPrefs.page, maxPage);
@@ -641,13 +624,6 @@ function KamidereRuntimeHud() {
 
         previousHasActiveTasksRef.current = hasActiveTasks;
     }, [currentPrefs.hidden, dragging, hasActiveTasks, morphState, resizing]);
-
-    React.useEffect(() => {
-        if (morphState || dragging || resizing) return;
-        if (tasks.length > 0 || !currentPrefs.hidden) return;
-
-        scheduleKamidereRuntimeAutoUnmount();
-    }, [currentPrefs.hidden, dragging, morphState, resizing, tasks.length]);
 
     if (activePrefs.hidden) {
         return (
