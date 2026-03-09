@@ -12,6 +12,10 @@ const TASKS_PER_PAGE = 3;
 const DOCK_LAUNCHER_VISUAL_SIZE = 12;
 const DOCK_LAUNCHER_HITBOX_SIZE = 30;
 const DOCK_LAUNCHER_GAP = 4;
+const EMPTY_HUD_HEIGHT = 52;
+const HUD_BASE_HEIGHT = 34;
+const HUD_TASK_HEIGHT = 46;
+const HUD_ROW_GAP = 6;
 const DEFAULT_DOCKED_LAUNCHER = {
     x: 48,
     y: 8,
@@ -116,6 +120,15 @@ function getDockedLauncherMetrics(): DockedLauncherMetrics {
         y: Math.round(rect.top + ((rect.height - size) / 2) - 1),
         size,
     };
+}
+
+function getExpectedHudHeight(taskCount: number) {
+    if (taskCount <= 0) {
+        return EMPTY_HUD_HEIGHT;
+    }
+
+    const rows = Math.min(taskCount, TASKS_PER_PAGE);
+    return HUD_BASE_HEIGHT + rows * HUD_TASK_HEIGHT + Math.max(0, rows - 1) * HUD_ROW_GAP;
 }
 
 function getHudMountTarget() {
@@ -531,6 +544,7 @@ function KamidereRuntimeHud() {
     const startExpand = React.useCallback(() => {
         setSuppressTaskEntrance(true);
         const rect = hudRef.current?.getBoundingClientRect();
+        const targetHeight = rect?.height ?? getExpectedHudHeight(visibleTasks.length);
         setMorphState({
             mode: "expand",
             fromX: dockMetrics.x,
@@ -540,14 +554,14 @@ function KamidereRuntimeHud() {
             fromWidth: dockMetrics.size,
             toWidth: currentPrefs.width,
             fromHeight: dockMetrics.size,
-            toHeight: rect?.height ?? 86,
+            toHeight: targetHeight,
             active: false,
         });
 
         window.requestAnimationFrame(() => {
             setMorphState(current => current ? { ...current, active: true } : current);
         });
-    }, [currentPrefs.width, currentPrefs.x, currentPrefs.y, dockMetrics.size, dockMetrics.x, dockMetrics.y]);
+    }, [currentPrefs.width, currentPrefs.x, currentPrefs.y, dockMetrics.size, dockMetrics.x, dockMetrics.y, visibleTasks.length]);
 
     React.useEffect(() => {
         if (!morphState?.active) return;
