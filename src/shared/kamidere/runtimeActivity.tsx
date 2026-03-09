@@ -89,6 +89,7 @@ let prefsLoaded = false;
 let mountNode: HTMLDivElement | null = null;
 let root: ReturnType<typeof createRoot> | null = null;
 let mountUsers = 0;
+let autoUnmountTimer: number | null = null;
 
 function clampWidth(width: number) {
     return Math.max(220, Math.min(420, width));
@@ -195,6 +196,12 @@ function persistPrefs() {
     void DataStore.set(HUD_PREFS_KEY, prefs);
 }
 
+function clearAutoUnmountTimer() {
+    if (autoUnmountTimer === null) return;
+    window.clearTimeout(autoUnmountTimer);
+    autoUnmountTimer = null;
+}
+
 export function subscribeKamidereRuntimeActivity(listener: () => void) {
     listeners.add(listener);
     return () => {
@@ -203,6 +210,11 @@ export function subscribeKamidereRuntimeActivity(listener: () => void) {
 }
 
 export function upsertKamidereRuntimeTask(task: Omit<KamidereRuntimeTask, "updatedAt"> & { updatedAt?: number; }) {
+    if (!root) {
+        mountKamidereRuntimeActivity();
+    }
+
+    clearAutoUnmountTimer();
     taskMap.set(task.id, {
         ...task,
         updatedAt: task.updatedAt ?? Date.now(),
@@ -230,6 +242,7 @@ export function mountKamidereRuntimeActivity() {
     const target = getHudMountTarget();
     if (!target) return;
 
+    clearAutoUnmountTimer();
     mountUsers += 1;
     void loadPrefs();
 
@@ -255,6 +268,7 @@ export function mountKamidereRuntimeActivity() {
 }
 
 export function unmountKamidereRuntimeActivity() {
+    clearAutoUnmountTimer();
     mountUsers = Math.max(0, mountUsers - 1);
     if (mountUsers > 0) return;
 
@@ -274,6 +288,20 @@ export function useKamidereRuntimeActivity() {
     }, []);
 
     return React.useMemo(() => getSnapshot(), [signal]);
+}
+
+export function scheduleKamidereRuntimeAutoUnmount(delayMs = 280) {
+    if (typeof window === "undefined") return;
+    clearAutoUnmountTimer();
+
+    autoUnmountTimer = window.setTimeout(() => {
+        autoUnmountTimer = null;
+        if (taskMap.size > 0 || !prefs.hidden || !root) {
+            return;
+        }
+
+        unmountKamidereRuntimeActivity();
+    }, delayMs);
 }
 
 function TaskCard({ task, animate = true }: { task: KamidereRuntimeTask; animate?: boolean; }) {
@@ -612,6 +640,13 @@ function KamidereRuntimeHud() {
 
         previousHasActiveTasksRef.current = hasActiveTasks;
     }, [currentPrefs.hidden, dragging, hasActiveTasks, morphState, resizing]);
+
+    React.useEffect(() => {
+        if (morphState || dragging || resizing) return;
+        if (tasks.length > 0 || !currentPrefs.hidden) return;
+
+        scheduleKamidereRuntimeAutoUnmount();
+    }, [currentPrefs.hidden, dragging, morphState, resizing, tasks.length]);
 
     if (activePrefs.hidden) {
         return (
