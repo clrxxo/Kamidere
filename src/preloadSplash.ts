@@ -22,17 +22,25 @@ interface SplashState {
     active: boolean;
     mounted: boolean;
     finished: boolean;
-    currentProgress: number;
-    targetProgress: number;
+    revealedCount: number;
+    targetRevealedCount: number;
     animationFrame: number | null;
+    phaseStartAt: number;
+    phaseDurationMs: number;
+    phaseFromCount: number;
+    phaseToCount: number;
+    finishingTimer: number | null;
+    fallbackTimer: number | null;
+    fallbackObserver: MutationObserver | null;
     root: HTMLDivElement | null;
     textNode: HTMLSpanElement | null;
+    charNodes: HTMLSpanElement[];
 }
 
 function getSplashCss() {
     return `
         html, body {
-            background: #070508;
+            background: var(--background-primary, #111214);
         }
 
         #${ROOT_ID} {
@@ -43,9 +51,8 @@ function getSplashCss() {
             place-items: center;
             overflow: hidden;
             background:
-                radial-gradient(circle at 22% 18%, rgb(245 184 95 / 0.12), transparent 28%),
-                radial-gradient(circle at 78% 78%, rgb(124 30 46 / 0.18), transparent 34%),
-                linear-gradient(135deg, #060406 0%, #0c0709 38%, #160a10 100%);
+                radial-gradient(circle at 50% 50%, rgb(255 255 255 / 0.028), transparent 34%),
+                linear-gradient(180deg, var(--background-primary, #111214) 0%, var(--background-secondary, #16181d) 100%);
             opacity: 1;
             visibility: visible;
             transition:
@@ -60,9 +67,8 @@ function getSplashCss() {
             position: absolute;
             inset: -18%;
             background:
-                radial-gradient(circle at 50% 50%, rgb(237 187 95 / 0.12), transparent 22%),
-                radial-gradient(circle at 50% 50%, rgb(255 255 255 / 0.03), transparent 38%);
-            filter: blur(34px);
+                radial-gradient(circle at 50% 50%, rgb(255 255 255 / 0.028), transparent 20%);
+            filter: blur(48px);
             transform: scale(1.08);
             pointer-events: none;
         }
@@ -88,23 +94,45 @@ function getSplashCss() {
         }
 
         .kamidere-loading-screen__text {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.02em;
             margin: 0;
-            color: #f7ead6;
             font-family: "gg sans", "ABC Ginto Nord", "Segoe UI Variable", "Helvetica Neue", system-ui, sans-serif;
             font-size: clamp(3.5rem, 9vw, 8.5rem);
             font-weight: 700;
-            letter-spacing: 0.14em;
+            letter-spacing: 0.1em;
             line-height: 1;
             text-transform: none;
             text-wrap: nowrap;
             text-shadow:
-                0 0 18px rgb(240 186 102 / 0.12),
-                0 0 38px rgb(123 30 46 / 0.2);
+                0 0 18px rgb(255 255 255 / 0.03);
             transition:
                 transform 460ms cubic-bezier(0.22, 1, 0.36, 1),
                 opacity 460ms cubic-bezier(0.22, 1, 0.36, 1),
                 filter 460ms cubic-bezier(0.22, 1, 0.36, 1);
             white-space: nowrap;
+        }
+
+        .kamidere-loading-screen__char {
+            display: inline-block;
+            min-width: 0.72em;
+            color: var(--header-primary, #f2f3f5);
+            text-align: center;
+            transition:
+                color 180ms ease,
+                opacity 180ms ease,
+                transform 180ms ease;
+        }
+
+        .kamidere-loading-screen__char.is-ghost {
+            color: var(--text-muted, #8b8d97);
+            opacity: 0.18;
+        }
+
+        .kamidere-loading-screen__char.is-scrambling {
+            color: var(--text-normal, #dbdee1);
+            opacity: 0.76;
         }
     `;
 }
@@ -121,12 +149,18 @@ function createRoot() {
 
     const textNode = document.createElement("span");
     textNode.className = "kamidere-loading-screen__text";
-    textNode.textContent = "";
+    const charNodes = Array.from(BRAND_NAME, char => {
+        const charNode = document.createElement("span");
+        charNode.className = "kamidere-loading-screen__char is-ghost";
+        charNode.textContent = char;
+        textNode.append(charNode);
+        return charNode;
+    });
 
     inner.append(textNode);
     root.append(inner);
 
-    return { root, textNode };
+    return { root, textNode, charNodes };
 }
 
 function ensureStyle() {
@@ -148,11 +182,12 @@ function ensureMounted(state: SplashState) {
 
     ensureStyle();
 
-    const { root, textNode } = createRoot();
+    const { root, textNode, charNodes } = createRoot();
     getMountTarget().append(root);
 
     state.root = root;
     state.textNode = textNode;
+    state.charNodes = charNodes;
     state.mounted = true;
 }
 
@@ -163,33 +198,119 @@ function randomGlyph(reference: string) {
     return reference === reference.toUpperCase() ? glyph.toUpperCase() : glyph.toLowerCase();
 }
 
-function renderText(state: SplashState) {
-    if (!state.textNode) return;
+function renderText(state: SplashState, revealCount: number, scrambleCount = 0) {
+    if (!state.charNodes.length) return;
 
-    const revealCount = Math.floor(BRAND_NAME.length * state.currentProgress);
-    const chars = Array.from(BRAND_NAME, (char, index) => index < revealCount ? char : randomGlyph(char));
-    state.textNode.textContent = chars.join("");
+    state.charNodes.forEach((node, index) => {
+        if (index < revealCount) {
+            node.textContent = BRAND_NAME[index];
+            node.className = "kamidere-loading-screen__char";
+            return;
+        }
+
+        if (index < revealCount + scrambleCount) {
+            node.textContent = randomGlyph(BRAND_NAME[index]);
+            node.className = "kamidere-loading-screen__char is-scrambling";
+            return;
+        }
+
+        node.textContent = BRAND_NAME[index];
+        node.className = "kamidere-loading-screen__char is-ghost";
+    });
 }
 
 function stepAnimation(state: SplashState) {
-    if (!state.active || state.finished) {
+    if (!state.active) {
         state.animationFrame = null;
         return;
     }
 
-    state.currentProgress += (state.targetProgress - state.currentProgress) * 0.18;
+    const elapsed = performance.now() - state.phaseStartAt;
+    const progress = Math.min(1, elapsed / state.phaseDurationMs);
+    const eased = 1 - Math.pow(1 - progress, 3);
+    const interpolated = state.phaseFromCount + (state.phaseToCount - state.phaseFromCount) * eased;
+    const revealCount = Math.floor(interpolated);
+    const scrambleCount = progress >= 1 ? 0 : Math.min(2, Math.max(1, state.phaseToCount - revealCount));
 
-    if (Math.abs(state.targetProgress - state.currentProgress) < 0.0025) {
-        state.currentProgress = state.targetProgress;
+    renderText(state, revealCount, scrambleCount);
+
+    if (progress >= 1) {
+        state.revealedCount = state.phaseToCount;
+        state.targetRevealedCount = state.phaseToCount;
+        state.animationFrame = null;
+        renderText(state, state.revealedCount, 0);
+
+        if (state.finished && state.finishingTimer == null) {
+            state.root?.classList.add("is-finishing");
+            state.finishingTimer = window.setTimeout(() => {
+                state.active = false;
+                state.root?.remove();
+                state.root = null;
+                state.textNode = null;
+                state.charNodes = [];
+            }, 480);
+        }
+
+        return;
     }
 
-    renderText(state);
     state.animationFrame = requestAnimationFrame(() => stepAnimation(state));
 }
 
-function ensureAnimation(state: SplashState) {
+function ensureAnimation(state: SplashState, nextCount: number) {
+    state.phaseStartAt = performance.now();
+    state.phaseDurationMs = Math.max(260, 260 + Math.abs(nextCount - state.revealedCount) * 110);
+    state.phaseFromCount = state.revealedCount;
+    state.phaseToCount = nextCount;
+
     if (state.animationFrame != null) return;
     state.animationFrame = requestAnimationFrame(() => stepAnimation(state));
+}
+
+function toRevealCount(stage: KamidereSplashStage | `${KamidereSplashStage}`) {
+    const progress = REVEAL_PROGRESS[stage as KamidereSplashStage] ?? 0;
+    return Math.max(1, Math.min(BRAND_NAME.length, Math.round(BRAND_NAME.length * progress)));
+}
+
+function cleanupFallback(state: SplashState) {
+    state.fallbackObserver?.disconnect();
+    state.fallbackObserver = null;
+
+    if (state.fallbackTimer != null) {
+        clearTimeout(state.fallbackTimer);
+        state.fallbackTimer = null;
+    }
+}
+
+function startFallbackFinishWatch(state: SplashState, bridge: KamidereSplashBridge) {
+    const maybeFinish = () => {
+        if (state.finished) return;
+
+        const appMount = document.querySelector("#app-mount") as HTMLElement | null;
+        const hasContent = !!appMount && appMount.querySelector("*") != null;
+
+        if (!hasContent) return;
+
+        bridge.setStage(KamidereSplashStage.Ready);
+        cleanupFallback(state);
+        window.setTimeout(() => bridge.finish(), 240);
+    };
+
+    state.fallbackObserver = new MutationObserver(() => {
+        window.setTimeout(maybeFinish, 40);
+    });
+
+    state.fallbackObserver.observe(document.documentElement, {
+        childList: true,
+        subtree: true
+    });
+
+    window.addEventListener("load", maybeFinish, { once: true });
+    state.fallbackTimer = window.setTimeout(() => {
+        bridge.setStage(KamidereSplashStage.Ready);
+        bridge.finish();
+        cleanupFallback(state);
+    }, 12000);
 }
 
 export function shouldInstallKamidereSplash() {
@@ -201,18 +322,25 @@ export function createKamidereSplashBridge(): KamidereSplashBridge {
         active: true,
         mounted: false,
         finished: false,
-        currentProgress: 0,
-        targetProgress: 0,
+        revealedCount: 0,
+        targetRevealedCount: 0,
         animationFrame: null,
+        phaseStartAt: 0,
+        phaseDurationMs: 360,
+        phaseFromCount: 0,
+        phaseToCount: 0,
+        finishingTimer: null,
+        fallbackTimer: null,
+        fallbackObserver: null,
         root: null,
-        textNode: null
+        textNode: null,
+        charNodes: []
     };
 
     const mount = () => {
         if (state.finished) return;
         ensureMounted(state);
-        ensureAnimation(state);
-        renderText(state);
+        renderText(state, state.revealedCount, 0);
     };
 
     if (document.documentElement) {
@@ -225,35 +353,23 @@ export function createKamidereSplashBridge(): KamidereSplashBridge {
 
     const bridge: KamidereSplashBridge = {
         setStage(stage) {
-            if (state.finished) return;
+            if (state.finished || !state.active) return;
 
             mount();
-            const progress = REVEAL_PROGRESS[stage as KamidereSplashStage] ?? state.targetProgress;
-            state.targetProgress = Math.max(state.targetProgress, progress);
+            const nextCount = Math.max(state.targetRevealedCount, toRevealCount(stage));
+            if (nextCount <= state.revealedCount && state.animationFrame == null) return;
+
+            state.targetRevealedCount = nextCount;
             state.root?.setAttribute("data-stage", stage);
-            ensureAnimation(state);
+            ensureAnimation(state, nextCount);
         },
         finish() {
-            if (state.finished) return;
+            if (state.finished || !state.active) return;
 
             mount();
             state.finished = true;
-            state.targetProgress = 1;
-            state.currentProgress = 1;
-            renderText(state);
-
-            if (state.animationFrame != null) {
-                cancelAnimationFrame(state.animationFrame);
-                state.animationFrame = null;
-            }
-
-            state.root?.classList.add("is-finishing");
-            window.setTimeout(() => {
-                state.active = false;
-                state.root?.remove();
-                state.root = null;
-                state.textNode = null;
-            }, 480);
+            cleanupFallback(state);
+            ensureAnimation(state, BRAND_NAME.length);
         },
         isActive() {
             return state.active;
@@ -261,5 +377,6 @@ export function createKamidereSplashBridge(): KamidereSplashBridge {
     };
 
     bridge.setStage(KamidereSplashStage.Preload);
+    startFallbackFinishWatch(state, bridge);
     return bridge;
 }
