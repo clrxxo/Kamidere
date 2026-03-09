@@ -576,6 +576,14 @@ function KamidereRuntimeHud() {
         if (morphState || dragging || resizing) return;
 
         const previousHasActiveTasks = previousHasActiveTasksRef.current;
+        if (hasActiveTasks) {
+            if (previousHasActiveTasks !== true) {
+                idleHydrationHandledRef.current = false;
+            }
+
+            previousHasActiveTasksRef.current = true;
+            return;
+        }
 
         if (!hasActiveTasks && !idleHydrationHandledRef.current) {
             idleHydrationHandledRef.current = true;

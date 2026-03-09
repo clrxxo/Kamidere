@@ -469,8 +469,6 @@ export function startMutualScannerWarmup(
                     },
                 }));
                 showToast("Manual cache warmup cancelled.", Toasts.Type.MESSAGE);
-                finishWarmup();
-                warmupController = null;
                 return;
             }
 

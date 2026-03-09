@@ -44,6 +44,7 @@ export interface GuildHydrationSnapshot {
     expiresAt: number;
     timedOut: boolean;
     budgetReached: boolean;
+    cancelled: boolean;
 }
 
 export interface GuildHydrationProgress {
@@ -176,6 +177,7 @@ function cloneSnapshot(snapshot: GuildHydrationSnapshot): GuildHydrationSnapshot
     return {
         ...snapshot,
         memberIds: Array.from(new Set(snapshot.memberIds.filter(Boolean))),
+        cancelled: Boolean(snapshot.cancelled),
     };
 }
 
@@ -191,6 +193,14 @@ function normalizeSnapshotRetention(snapshot: GuildHydrationSnapshot) {
     return normalized;
 }
 
+function isReusableSnapshot(snapshot: GuildHydrationSnapshot) {
+    if (snapshot.cancelled || snapshot.timedOut) {
+        return false;
+    }
+
+    return snapshot.chunksSeen > 0 || snapshot.finalCount > snapshot.initialCount;
+}
+
 async function loadSnapshot(ownerId: string | null, guildId: string) {
     if (!ownerId) return null;
 
@@ -198,7 +208,13 @@ async function loadSnapshot(ownerId: string | null, guildId: string) {
     const cached = snapshotCache.get(cacheKey);
     if (cached) {
         if (cached.expiresAt > Date.now()) {
-            return cloneSnapshot(cached);
+            if (isReusableSnapshot(cached)) {
+                return cloneSnapshot(cached);
+            }
+
+            snapshotCache.delete(cacheKey);
+            void DataStore.del(getStorageKey(ownerId, guildId));
+            return null;
         }
 
         snapshotCache.delete(cacheKey);
@@ -211,6 +227,11 @@ async function loadSnapshot(ownerId: string | null, guildId: string) {
 
     const normalized = normalizeSnapshotRetention(stored);
     if (normalized.expiresAt <= Date.now()) {
+        void deleteSnapshot(ownerId, guildId);
+        return null;
+    }
+
+    if (!isReusableSnapshot(normalized)) {
         void deleteSnapshot(ownerId, guildId);
         return null;
     }
@@ -323,6 +344,11 @@ export async function listHydratedGuildSnapshots(ownerId: string | null) {
             continue;
         }
 
+        if (!isReusableSnapshot(normalized)) {
+            await deleteSnapshot(normalized.ownerId, normalized.guildId);
+            continue;
+        }
+
         snapshotCache.set(makeSnapshotKey(normalized), normalized);
         if (normalized.expiresAt !== snapshot.expiresAt) {
             await DataStore.set(getStorageKey(normalized.ownerId, normalized.guildId), normalized);
@@ -409,6 +435,7 @@ export async function hydrateGuildMemberCache(guildId: string, options: GuildHyd
                 expiresAt,
                 timedOut,
                 budgetReached,
+                cancelled: false,
             } satisfies GuildHydrationSnapshot;
         };
 
@@ -630,7 +657,7 @@ export async function hydrateGuildMemberCache(guildId: string, options: GuildHyd
 
             while (true) {
                 if (controller?.cancelled) {
-                    const snapshot = buildSnapshot();
+                    const snapshot = { ...buildSnapshot(), cancelled: true };
                     await persistSnapshot(snapshot);
                     activeControllers.delete(controller);
                     emitProgress("cancelled");
