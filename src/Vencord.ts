@@ -32,7 +32,6 @@ import { coreStyleRootNode, initStyles } from "@api/Styles";
 import { openSettingsTabModal, UpdaterTab } from "@components/settings";
 import { BRAND_NAME } from "@shared/branding";
 import { debounce } from "@shared/debounce";
-import { initKamidereEntry } from "@shared/kamidereEntry";
 import { IS_WINDOWS } from "@utils/constants";
 import { createAndAppendStyle } from "@utils/css";
 import { StartAt } from "@utils/types";
@@ -208,7 +207,6 @@ function initTrayIpc() {
 async function init() {
     await onceReady;
     startAllPlugins(StartAt.WebpackReady);
-    initKamidereEntry();
 
     syncSettings();
     initTrayIpc();
