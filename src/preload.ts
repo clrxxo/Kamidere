@@ -18,28 +18,17 @@
 
 import { debounce } from "@shared/debounce";
 import { IpcEvents } from "@shared/IpcEvents";
-import { KamidereSplashStage } from "@shared/kamidereSplash";
 import { contextBridge, webFrame } from "electron/renderer";
 
 import VencordNative, { invoke, sendSync } from "./VencordNative";
-import { createKamidereSplashBridge, shouldInstallKamidereSplash } from "./preloadSplash";
 
 contextBridge.exposeInMainWorld("VencordNative", VencordNative);
-
-const kamidereSplash = shouldInstallKamidereSplash()
-    ? createKamidereSplashBridge()
-    : null;
-
-if (kamidereSplash) {
-    contextBridge.exposeInMainWorld("KamidereSplash", kamidereSplash);
-}
 
 // Discord
 if (location.protocol !== "data:") {
     invoke(IpcEvents.INIT_FILE_WATCHERS);
 
     if (IS_DISCORD_DESKTOP) {
-        kamidereSplash?.setStage(KamidereSplashStage.Renderer);
         webFrame.executeJavaScript(sendSync<string>(IpcEvents.PRELOAD_GET_RENDERER_JS));
         // Not supported in sandboxed preload scripts but Discord doesn't support it either so who cares
         require(process.env.DISCORD_PRELOAD!);

@@ -65,9 +65,7 @@ declare global {
     export var VesktopNative: any;
     export var unsafeWindow: any;
 
-    interface Window extends Record<PropertyKey, any> {
-        KamidereSplash?: import("./shared/kamidereSplash").KamidereSplashBridge;
-    }
+    interface Window extends Record<PropertyKey, any> { }
 }
 
 export { };

@@ -17,7 +17,6 @@
 */
 
 import { onceDefined } from "@shared/onceDefined";
-import { KAMIDERE_SPLASH_MAIN_WINDOW_ARG } from "@shared/kamidereSplash";
 import electron, { app, BrowserWindowConstructorOptions, Menu } from "electron";
 import { dirname, join } from "path";
 
@@ -78,10 +77,6 @@ if (!IS_VANILLA) {
                 options.webPreferences.sandbox = false;
                 // work around discord unloading when in background
                 options.webPreferences.backgroundThrottling = false;
-                options.webPreferences.additionalArguments = [
-                    ...(options.webPreferences.additionalArguments ?? []),
-                    ...(isMainWindow ? [KAMIDERE_SPLASH_MAIN_WINDOW_ARG] : [])
-                ];
 
                 if (settings.frameless) {
                     options.frame = false;
