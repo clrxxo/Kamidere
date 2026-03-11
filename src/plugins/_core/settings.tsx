@@ -22,6 +22,7 @@ import { BRAND_NAME } from "@shared/branding";
 import { gitHashShort } from "@shared/vencordUserAgent";
 import { Devs } from "@utils/constants";
 import { isTruthy } from "@utils/guards";
+import { Logger } from "@utils/Logger";
 import definePlugin, { IconProps, OptionType } from "@utils/types";
 import { findByPropsLazy } from "@webpack";
 import { React } from "@webpack/common";
@@ -50,6 +51,7 @@ const enum LayoutType {
 }
 
 const LayoutTypes: typeof LayoutType = findByPropsLazy("SECTION", "SIDEBAR_ITEM", "PANEL");
+const logger = new Logger("Settings");
 
 type SettingsLocation =
     | "top"
@@ -87,6 +89,43 @@ interface SettingsLayoutBuilder {
 
 const SECTION_KEY_PREFIX = "equicord_section";
 const CUSTOM_ENTRY_DIVIDER_CLASS = "vc-kamidere-settings-plugin-divider";
+const DEFAULT_SETTINGS_LOCATION: SettingsLocation = "aboveNitro";
+const SETTINGS_LOCATIONS = new Set<SettingsLocation>([
+    "top",
+    "aboveNitro",
+    "belowNitro",
+    "aboveActivity",
+    "belowActivity",
+    "bottom",
+]);
+
+function isRenderableComponent(value: unknown): value is ComponentType<any> {
+    return typeof value === "function" || (typeof value === "object" && value !== null);
+}
+
+function isValidEntryOptions(entry: unknown): entry is EntryOptions {
+    return typeof entry === "object"
+        && entry !== null
+        && typeof (entry as { key?: unknown; }).key === "string"
+        && typeof (entry as { title?: unknown; }).title === "string"
+        && isRenderableComponent((entry as { Component?: unknown; }).Component)
+        && isRenderableComponent((entry as { Icon?: unknown; }).Icon);
+}
+
+function isValidSettingsSectionMapping(entry: unknown): entry is [string, string] {
+    return Array.isArray(entry)
+        && entry.length >= 2
+        && typeof entry[0] === "string"
+        && entry[0].length > 0
+        && typeof entry[1] === "string"
+        && entry[1].length > 0;
+}
+
+function getSafeSettingsLocation(value: unknown): SettingsLocation {
+    return typeof value === "string" && SETTINGS_LOCATIONS.has(value as SettingsLocation)
+        ? value as SettingsLocation
+        : DEFAULT_SETTINGS_LOCATION;
+}
 
 const settings = definePluginSettings({
     settingsLocation: {
@@ -192,7 +231,7 @@ export default definePlugin({
     },
 
     getSettingsSectionMappings() {
-        return settingsSectionMap;
+        return settingsSectionMap.filter(isValidSettingsSectionMapping);
     },
 
     layoutVersion: 0,
@@ -204,6 +243,11 @@ export default definePlugin({
 
     getSectionEntries() {
         const { buildEntry } = this;
+        const customEntries = this.customEntries.filter(isValidEntryOptions);
+
+        if (customEntries.length !== this.customEntries.length) {
+            logger.warn("Skipping invalid custom settings entries", this.customEntries.filter(entry => !isValidEntryOptions(entry)));
+        }
 
         return [
             buildEntry({
@@ -257,7 +301,7 @@ export default definePlugin({
                 Component: PatchHelperTab,
                 Icon: PatchHelperIcon
             }),
-            ...this.customEntries.map(buildEntry)
+            ...customEntries.map(buildEntry)
         ].filter(isTruthy);
     },
 
@@ -280,7 +324,7 @@ export default definePlugin({
             buildLayout: () => this.getSectionEntries()
         };
 
-        const { settingsLocation } = settings.store;
+        const settingsLocation = getSafeSettingsLocation(settings.store.settingsLocation);
 
         const places: Record<SettingsLocation, string> = {
             top: "user_section",
@@ -319,6 +363,8 @@ export default definePlugin({
     },
 
     findSidebarItemElement(entry: EntryOptions) {
+        if (!isValidEntryOptions(entry)) return null;
+
         const route = `${entry.key}_panel`;
 
         const directMatch = document.querySelector<HTMLElement>(
@@ -372,11 +418,12 @@ export default definePlugin({
     },
 
     syncCustomEntrySidebarDecorations() {
-        if (!this.customEntries.length) return;
+        const customEntries = this.customEntries.filter(isValidEntryOptions);
+        if (!customEntries.length) return;
 
         this.clearCustomEntrySidebarDecorations();
 
-        const firstCustomEntryElement = this.customEntries
+        const firstCustomEntryElement = customEntries
             .map(entry => this.findSidebarItemElement(entry))
             .find((element): element is HTMLElement => element !== null);
         if (!firstCustomEntryElement) return;

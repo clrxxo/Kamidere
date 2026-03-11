@@ -57,6 +57,10 @@ function isDisplayPlugin(plugin: unknown): plugin is typeof Plugins[keyof typeof
         && typeof (plugin as { name?: unknown; }).name === "string";
 }
 
+function hasApiSuffix(name: unknown): name is string {
+    return typeof name === "string" && name.endsWith("API");
+}
+
 function showErrorToast(message: string) {
     Toasts.show({
         message,
@@ -249,7 +253,7 @@ export default function PluginSettings() {
                 if (!PluginMeta[plugin.name]?.userPlugin) return false;
                 break;
             case SearchStatus.API_PLUGINS:
-                if (!plugin.name.endsWith("API")) return false;
+                if (!hasApiSuffix(plugin.name)) return false;
                 break;
         }
 
@@ -289,7 +293,7 @@ export default function PluginSettings() {
 
         const showApi = searchValue.status === SearchStatus.API_PLUGINS;
         for (const p of sortedPlugins) {
-            if (p.hidden || (!p.settings?.def && p.name.endsWith("API") && !showApi))
+            if (p.hidden || (!p.settings?.def && hasApiSuffix(p.name) && !showApi))
                 continue;
 
             if (!pluginFilter(p, newPluginsSet)) continue;
@@ -374,15 +378,15 @@ export default function PluginSettings() {
 
     // Code directly taken from supportHelper.tsx
     const { totalStockPlugins, totalUserPlugins, enabledStockPlugins, enabledUserPlugins, enabledPlugins } = useMemo(() => {
-        const isApiPlugin = (plugin: string) => plugin.endsWith("API") || Boolean(Plugins[plugin]?.required);
+        const isApiPlugin = (plugin: string) => hasApiSuffix(plugin) || Boolean(Plugins[plugin]?.required);
 
         const totalPlugins = Object.keys(Plugins).filter(p => !isApiPlugin(p));
         const enabledPlugins = Object.keys(Plugins).filter(p => isPluginEnabled(p) && !isApiPlugin(p));
 
-        const totalStockPlugins = totalPlugins.filter(p => !PluginMeta[p].userPlugin && !Plugins[p]?.hidden).length;
-        const totalUserPlugins = totalPlugins.filter(p => PluginMeta[p].userPlugin).length;
-        const enabledStockPlugins = enabledPlugins.filter(p => !PluginMeta[p].userPlugin).length;
-        const enabledUserPlugins = enabledPlugins.filter(p => PluginMeta[p].userPlugin).length;
+        const totalStockPlugins = totalPlugins.filter(p => !PluginMeta[p]?.userPlugin && !Plugins[p]?.hidden).length;
+        const totalUserPlugins = totalPlugins.filter(p => PluginMeta[p]?.userPlugin).length;
+        const enabledStockPlugins = enabledPlugins.filter(p => !PluginMeta[p]?.userPlugin).length;
+        const enabledUserPlugins = enabledPlugins.filter(p => PluginMeta[p]?.userPlugin).length;
         return { totalStockPlugins, totalUserPlugins, enabledStockPlugins, enabledUserPlugins, enabledPlugins };
     }, [settings.plugins]);
     const pluginsToLoad = Math.min(36, plugins.length);

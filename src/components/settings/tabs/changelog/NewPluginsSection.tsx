@@ -27,6 +27,10 @@ function isChangelogPlugin(plugin: unknown): plugin is typeof Plugins[keyof type
         && typeof (plugin as { name?: unknown; }).name === "string";
 }
 
+function hasApiSuffix(name: unknown): name is string {
+    return typeof name === "string" && name.endsWith("API");
+}
+
 interface NewPluginsSectionProps {
     newPlugins: string[];
     onPluginToggle?: (pluginName: string, enabled: boolean) => void;
@@ -101,7 +105,7 @@ export function NewPluginsSection({
                         depMap[plugin.name]?.some(
                             d => settings.plugins[d]?.enabled,
                         ) ||
-                        plugin.name.endsWith("API");
+                        hasApiSuffix(plugin.name);
                     const tooltipText = plugin.required
                         ? `This plugin is required for ${BRAND_NAME} to function.`
                         : makeDependencyList(

@@ -228,7 +228,9 @@ export default function PluginModal({ plugin, onRestartNeeded, onClose, transiti
 
     const pluginMeta = PluginMeta[plugin.name];
     const sourceInfo = getPluginSourceInfo(pluginMeta?.folderName, pluginMeta?.userPlugin, plugin.isModified ?? false, plugin.name);
-    const sourceUrl = gitRemote ? `https://github.com/${gitRemote}/tree/main/${pluginMeta.folderName}` : null;
+    const sourceUrl = gitRemote && pluginMeta?.folderName
+        ? `https://github.com/${gitRemote}/tree/main/${pluginMeta.folderName}`
+        : null;
 
     return (
         <ModalRoot transitionState={transitionState} size={ModalSize.MEDIUM}>
@@ -335,7 +337,7 @@ export default function PluginModal({ plugin, onRestartNeeded, onClose, transiti
                                 )}
                             </Tooltip>
                         ) : <div />}
-                        {!pluginMeta.userPlugin && (
+                        {!pluginMeta?.userPlugin && (
                             <div className={cl("links")}>
                                 {sourceInfo.websiteUrl && (
                                     <WebsiteButton

@@ -33,6 +33,10 @@ function isContributorPlugin(plugin: unknown): plugin is typeof Plugins[keyof ty
         && Array.isArray((plugin as { authors?: unknown; }).authors);
 }
 
+function hasApiSuffix(name: unknown): name is string {
+    return typeof name === "string" && name.endsWith("API");
+}
+
 export function openContributorModal(user: User) {
     openModal(modalProps =>
         <ModalRoot {...modalProps}>
@@ -66,7 +70,7 @@ function ContributorModal({ user }: { user: User; }) {
             );
 
         return pluginsByAuthor
-            .filter(p => !p.name.endsWith("API"))
+            .filter(p => !hasApiSuffix(p.name))
             .sort((a, b) => Number(a.required ?? false) - Number(b.required ?? false));
     }, [user.id, user.username]);
 
